@@ -49,19 +49,22 @@ binding signature.
 import { readFile } from "node:fs/promises";
 import { Esigner } from "@esigner/sdk";
 
-const esigner = new Esigner(process.env.ESIGNER_API_KEY!);   // market: "no" by default
+// market: "no" by default — { market: "se" } for esigner.se
+const esigner = new Esigner(process.env.ESIGNER_API_KEY!);
 
 const request = await esigner.signatureRequests.createWithFiles(
   { data: await readFile("contract.pdf"), filename: "contract.pdf" },
   {
-    ownerEmail: "post@company.no",          // receives the receipt and the signed PDF
+    // The sender: receives the receipt and the signed PDF
+    ownerEmail: "post@company.no",
     signers: [
       { name: "Ola Nordmann", email: "ola@example.no" },
       { name: "Kari Nordmann", email: "kari@example.no" },
     ],
     useSubscription: true,                  // draw from your plan's quota
     signingEids: ["no_bankid"],             // optional: Norwegian BankID only
-    returnUrl: "https://app.example.com/contracts/123/signed",  // optional: where signers land after
+    // Optional: where signers land after the eID step
+    returnUrl: "https://app.example.com/contracts/123/signed",
   },
 );
 
@@ -75,7 +78,8 @@ Using another market? `new Esigner(key, { market: "se" })` — see the table bel
 ```ts
 const signed = await esigner.signatureRequests.retrieve(request.id);
 if (signed.status === "completed") {
-  const pdf = await esigner.signatureRequests.downloadSignedDocument(request.id);  // Uint8Array
+  // The signed PDF as a Uint8Array
+  const pdf = await esigner.signatureRequests.downloadSignedDocument(request.id);
 }
 ```
 
@@ -94,7 +98,9 @@ esigner signs every delivery with `Esigner-Signature: t=<unix>,v1=<hmac>`. Verif
 import express from "express";
 import { Esigner, WebhookSignatureError } from "@esigner/sdk";
 
-app.post("/webhooks/esigner", express.raw({ type: "application/json" }), async (req, res) => {
+const raw = express.raw({ type: "application/json" });
+
+app.post("/webhooks/esigner", raw, async (req, res) => {
   try {
     const event = await Esigner.webhooks.constructEvent(
       req.body,                                   // Buffer — the raw body
@@ -102,8 +108,13 @@ app.post("/webhooks/esigner", express.raw({ type: "application/json" }), async (
       process.env.ESIGNER_WEBHOOK_SECRET!,        // whsec_…
     );
     switch (event.type) {
-      case "signer.signed":      console.log(`${event.data.signersSigned}/${event.data.signersTotal} signed`); break;
-      case "document.completed": /* fetch the signed PDF */ break;
+      case "signer.signed":
+        const { signersSigned, signersTotal } = event.data;
+        console.log(`${signersSigned} of ${signersTotal} signed`);
+        break;
+      case "document.completed":
+        // fetch the signed PDF
+        break;
     }
     res.sendStatus(200);
   } catch (err) {
@@ -118,7 +129,9 @@ Events: `signer.signed`, `signer.declined`, `document.completed`, `document.canc
 some? Read them back:
 
 ```ts
-for await (const event of esigner.events.all({ type: "document.completed" })) { /* … */ }
+for await (const event of esigner.events.all({ type: "document.completed" })) {
+  // …
+}
 ```
 
 ## Errors
