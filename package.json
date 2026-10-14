@@ -40,6 +40,13 @@
     "webhooks"
   ],
   "homepage": "https://esigner.no/dokumentasjon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esigner-me/esigner-sdk-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/esigner-me/esigner-sdk-node/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
