@@ -55,7 +55,7 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "prepublishOnly": "pnpm test && pnpm build"
+    "prepublishOnly": "npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
