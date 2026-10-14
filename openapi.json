@@ -1,0 +1,2157 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "esigner API",
+    "version": "1.0.0",
+    "description": "Create BankID/eID signature requests and receive signed PDFs.\n\nAuthenticate with an API key: `Authorization: Bearer sk_live_…`. Test-mode keys (`sk_test_…`) run against the provider sandbox and never consume quota or move money.\n\nPOSTs accept an `Idempotency-Key` header — retrying with the same key replays the original response rather than creating a second signature request.\n\nEvents are delivered to webhook endpoints, signed with `Esigner-Signature: t=<unix>,v1=<hmac>`."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "x-error-codes": [
+    {
+      "status": 400,
+      "code": "validation",
+      "meaning": "The request body failed schema validation. `issues` carries the field-level detail."
+    },
+    {
+      "status": 401,
+      "code": "unauthorized",
+      "meaning": "Missing, malformed or revoked API key."
+    },
+    {
+      "status": 403,
+      "code": "insufficient_scope",
+      "meaning": "The key is valid but lacks the scope the endpoint declares. `WWW-Authenticate` names what was needed."
+    },
+    {
+      "status": 403,
+      "code": "cross_owner_document",
+      "meaning": "The documentId belongs to a different account than the key."
+    },
+    {
+      "status": 404,
+      "code": "not_found",
+      "meaning": "No such resource — or it belongs to another account. Deliberately indistinguishable."
+    },
+    {
+      "status": 409,
+      "code": "quota_exceeded",
+      "meaning": "The subscription has too few signatures left for this request. `remaining` says how many there are. Every plan has a hard limit — Team's is a per-seat monthly pool shared by the whole company."
+    },
+    {
+      "status": 400,
+      "code": "payment_method_conflict",
+      "meaning": "`paymentMethod` contradicts `useSubscription` or a free-signing link. Send one or the other."
+    },
+    {
+      "status": 409,
+      "code": "no_payment_method",
+      "meaning": "`paymentMethod: \"auto\"` but the account has no subscription or payment method to charge."
+    },
+    {
+      "status": 402,
+      "code": "insufficient_balance",
+      "meaning": "The prepaid balance doesn't cover the request. `balanceOre` and `requiredOre` say by how much. Nothing was created."
+    },
+    {
+      "status": 402,
+      "code": "payment_method_declined",
+      "meaning": "The saved card was declined. `declineCode` carries the bank's reason. Nothing was created."
+    },
+    {
+      "status": 402,
+      "code": "payment_method_action_required",
+      "meaning": "The bank requires the cardholder to be present. Save the card again under /konto/betaling."
+    },
+    {
+      "status": 503,
+      "code": "payment_unconfirmed",
+      "meaning": "The card charge's outcome could not be confirmed. `orderId` is returned — read it before retrying, so a held payment isn't doubled."
+    },
+    {
+      "status": 400,
+      "code": "invalid_return_url",
+      "meaning": "`returnUrl` is not an absolute https URL (http only with a test key), or it carries credentials. `message` says which."
+    },
+    {
+      "status": 400,
+      "code": "signing_eid_unavailable",
+      "meaning": "`signingEids` names an eID this deployment does not offer. `unavailable` lists them and `available` lists what you may use. Nothing was created."
+    },
+    {
+      "status": 409,
+      "code": "payment_method_unavailable",
+      "meaning": "The named `paymentMethod` is not offered on this deployment."
+    },
+    {
+      "status": 409,
+      "code": "already_signed",
+      "meaning": "Cancel was refused: at least one signer has already signed."
+    },
+    {
+      "status": 409,
+      "code": "not_cancellable",
+      "meaning": "Cancel was refused: the request is no longer open (completed, expired, failed, or locked)."
+    },
+    {
+      "status": 502,
+      "code": "payment_reversal_failed",
+      "meaning": "Cancel could not return the pay-per-use payment, so the request was left open. Retry."
+    },
+    {
+      "status": 409,
+      "code": "no_subscription",
+      "meaning": "`useSubscription: true` but the account has no active subscription."
+    },
+    {
+      "status": 409,
+      "code": "topup_in_progress",
+      "meaning": "An automatic top-up is already running. Retry shortly."
+    },
+    {
+      "status": 409,
+      "code": "topup_cooldown",
+      "meaning": "A renewal failed recently; automatic top-up is on a 24h cool-down."
+    },
+    {
+      "status": 409,
+      "code": "not_completed",
+      "meaning": "The signed PDF was requested before every signer had signed. `detail` names the current status."
+    },
+    {
+      "status": 409,
+      "code": "seal_footer_locked",
+      "meaning": "Signers cannot be added to a request created with `sealFooter: true` — the roster is inside the signed file."
+    },
+    {
+      "status": 409,
+      "code": "signer_roster_full",
+      "meaning": "The request has room for no more signers: someone has already signed, and the signing provider sizes the signature pages before the first signature. Create a new request for the extra signers."
+    },
+    {
+      "status": 410,
+      "code": "gone",
+      "meaning": "The files behind this signature request have been deleted."
+    },
+    {
+      "status": 410,
+      "code": "revoked",
+      "meaning": "This document is locked — by its sender or by an administrator."
+    },
+    {
+      "status": 409,
+      "code": "idempotency_key_in_progress",
+      "meaning": "The first request with this Idempotency-Key hasn't finished. Retry."
+    },
+    {
+      "status": 413,
+      "code": "—",
+      "meaning": "A single uploaded file exceeded the size limit."
+    },
+    {
+      "status": 422,
+      "code": "idempotency_key_reused",
+      "meaning": "The same Idempotency-Key was used with a different request body. That's a caller bug, so we surface it."
+    },
+    {
+      "status": 429,
+      "code": "too_many_requests",
+      "meaning": "Rate limited. `Retry-After` says how long to wait."
+    },
+    {
+      "status": 502,
+      "code": "signing_failed",
+      "meaning": "The eID provider rejected the handoff. The document lands in `signing_failed` and can be retried."
+    },
+    {
+      "status": 503,
+      "code": "—",
+      "meaning": "Maintenance. New uploads and signature requests are paused; existing ones keep running."
+    }
+  ],
+  "x-webhook-events": [
+    {
+      "type": "document.completed",
+      "description": "Every signer has signed. The signed PDF is available until `downloadExpiresAt`.",
+      "dataSchema": "DocumentCompletedData"
+    },
+    {
+      "type": "document.signing_failed",
+      "description": "The eID provider rejected the handoff. The sender can retry the document.",
+      "dataSchema": "DocumentSigningFailedData"
+    },
+    {
+      "type": "document.cancelled",
+      "description": "The request was cancelled before anyone signed — over the API or from the account. Its signing links no longer work.",
+      "dataSchema": "DocumentCancelledData"
+    },
+    {
+      "type": "signer.signed",
+      "description": "One signer has signed. Sent once per signer, before `document.completed` for the last one — follow a request with several parties as it goes.",
+      "dataSchema": "SignerSignedData"
+    },
+    {
+      "type": "signer.declined",
+      "description": "One signer refused to sign. The request stays open; cancel it or send a new one.",
+      "dataSchema": "SignerDeclinedData"
+    },
+    {
+      "type": "order.captured",
+      "description": "A pay-per-use payment was captured. Not emitted for subscription-covered requests.",
+      "dataSchema": "OrderCapturedData"
+    }
+  ],
+  "x-webhook-envelope": "WebhookEvent",
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Your API key, e.g. `Authorization: Bearer sk_live_…`. Create one at /konto."
+      }
+    },
+    "schemas": {
+      "WebhookEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Also sent as the `Esigner-Event-Id` header. Dedupe on it — a retry reuses the id."
+          },
+          "type": {
+            "type": "string",
+            "description": "Also sent as the `Esigner-Event-Type` header.",
+            "example": "document.completed"
+          },
+          "livemode": {
+            "type": "boolean"
+          },
+          "created": {
+            "type": "integer",
+            "description": "Unix seconds. Note: GET /events returns this field as an ISO string instead.",
+            "example": 1784000000
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Per event type — see below."
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "livemode",
+          "created",
+          "data"
+        ]
+      },
+      "DocumentCompletedData": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The same id as `SignatureRequest.id`."
+          },
+          "filename": {
+            "type": "string",
+            "example": "avtale.pdf"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merged",
+              "separate"
+            ],
+            "description": "Whether the uploads were signed as one merged PDF or individually."
+          },
+          "downloadExpiresAt": {
+            "type": "string",
+            "description": "ISO 8601. Fetch the signed PDF before this.",
+            "example": "2026-08-13T10:24:00.000Z"
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "nullable": true,
+                  "example": "Ola Nordmann"
+                },
+                "email": {
+                  "type": "string",
+                  "nullable": true,
+                  "example": "ola@example.no"
+                },
+                "signedAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "ISO 8601.",
+                  "example": "2026-07-13T10:24:00.000Z"
+                }
+              },
+              "required": [
+                "name",
+                "email",
+                "signedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "documentId",
+          "orderId",
+          "filename",
+          "mode",
+          "downloadExpiresAt",
+          "signers"
+        ]
+      },
+      "DocumentSigningFailedData": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": "string",
+            "description": "Why the eID provider rejected the handoff.",
+            "example": "signature order rejected"
+          }
+        },
+        "required": [
+          "documentId",
+          "orderId",
+          "message"
+        ]
+      },
+      "DocumentCancelledData": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The same id as `SignatureRequest.id`."
+          },
+          "releasedSignatures": {
+            "type": "integer",
+            "description": "Signatures returned to the subscription's quota. 0 on pay-per-use and in test mode.",
+            "example": 3
+          },
+          "refundedOre": {
+            "type": "integer",
+            "description": "Pay-per-use amount no longer charged, in minor units (øre), VAT included. 0 on a subscription.",
+            "example": 0
+          },
+          "returnedToBalanceOre": {
+            "type": "integer",
+            "description": "Amount put back on the prepaid balance, in minor units (øre). 0 unless the request was paid from balance.",
+            "example": 0
+          }
+        },
+        "required": [
+          "documentId",
+          "orderId",
+          "releasedSignatures",
+          "refundedOre",
+          "returnedToBalanceOre"
+        ]
+      },
+      "OrderCapturedData": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountOre": {
+            "type": "integer",
+            "description": "Captured amount in minor units (øre), VAT included.",
+            "example": 3625
+          }
+        },
+        "required": [
+          "orderId",
+          "documentId",
+          "amountOre"
+        ]
+      },
+      "SignerSignedData": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The same id as `SignatureRequest.id`."
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "signer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The same id as `SignatureRequest.signers[].id`."
+              },
+              "name": {
+                "type": "string",
+                "nullable": true,
+                "example": "Ola Nordmann"
+              },
+              "email": {
+                "type": "string",
+                "nullable": true,
+                "example": "ola@example.no"
+              },
+              "phone": {
+                "type": "string",
+                "nullable": true,
+                "example": "+4791234567"
+              },
+              "position": {
+                "type": "integer",
+                "description": "0-based order in the request's signer list."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email",
+              "phone",
+              "position"
+            ]
+          },
+          "signedAt": {
+            "type": "string",
+            "description": "ISO 8601.",
+            "example": "2026-07-13T10:24:00.000Z"
+          },
+          "signersSigned": {
+            "type": "integer",
+            "description": "How many of the request's signers have signed, this one included.",
+            "example": 1
+          },
+          "signersTotal": {
+            "type": "integer",
+            "example": 3
+          }
+        },
+        "required": [
+          "orderId",
+          "documentId",
+          "signer",
+          "signedAt",
+          "signersSigned",
+          "signersTotal"
+        ]
+      },
+      "SignerDeclinedData": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The same id as `SignatureRequest.id`."
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "signer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The same id as `SignatureRequest.signers[].id`."
+              },
+              "name": {
+                "type": "string",
+                "nullable": true,
+                "example": "Ola Nordmann"
+              },
+              "email": {
+                "type": "string",
+                "nullable": true,
+                "example": "ola@example.no"
+              },
+              "phone": {
+                "type": "string",
+                "nullable": true,
+                "example": "+4791234567"
+              },
+              "position": {
+                "type": "integer",
+                "description": "0-based order in the request's signer list."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email",
+              "phone",
+              "position"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "description": "What the signer wrote, when the signing page asked."
+          },
+          "signersSigned": {
+            "type": "integer"
+          },
+          "signersTotal": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "orderId",
+          "documentId",
+          "signer",
+          "reason",
+          "signersSigned",
+          "signersTotal"
+        ]
+      },
+      "SignatureRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The signature request id — pass it to GET /signature_requests/{id}."
+          },
+          "object": {
+            "type": "string",
+            "enum": [
+              "signature_request"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "draft | pending_payment | in_progress | completed | expired | cancelled | signing_failed. `in_progress` means the signers have been invited; `cancelled` means it was stopped before anyone signed (see POST /signature_requests/{id}/cancel); `signing_failed` means the eID provider rejected the handoff and the request can be retried.",
+            "example": "in_progress"
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "filename": {
+                "type": "string",
+                "example": "avtale.pdf"
+              }
+            },
+            "required": [
+              "id",
+              "filename"
+            ],
+            "description": "The document being signed."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Stable id for this signer within the request."
+                },
+                "name": {
+                  "type": "string",
+                  "nullable": true,
+                  "example": "Ola Nordmann"
+                },
+                "email": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "null for a signer reached only by SMS.",
+                  "example": "ola@example.no"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "pending | notified | viewed | signed | declined | expired",
+                  "example": "signed"
+                },
+                "signed_at": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "ISO 8601, null until this signer has signed.",
+                  "example": "2026-07-13T10:24:00.000Z"
+                },
+                "sign_url": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "This signer's private signing page — the document, the deadline, and the button that starts BankID/MitID. It is the same URL the invitation email carries, so it is safe to send even when we also mailed it; with `notifySigners: false` it is the ONLY copy that exists and you must deliver it yourself.\n\n**Treat it as a credential**: the token in the path is what authorises the signature, so anyone holding the link can sign as that person. Send it to the signer, never anywhere public. null until the request has been handed to the eID provider (i.e. while it is still `pending_payment`), and on requests created before this field existed.",
+                  "example": "https://esigner.no/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44"
+                },
+                "sign_url_direct": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Same signer, one step shorter: a redirect that takes them straight into BankID/MitID with no esigner page in between. For a flow whose own UI already showed the document and collected the approval click.\n\nFalls back to `sign_url` by redirecting there whenever it cannot skip — the request is password-protected, expired, cancelled, or the eID hand-off has not finished — so it is always safe to link. Note the signer then never sees the document on OUR surface: in the hosted eID flow the provider still presents it before signing, so use this when your own product has already put the document in front of them.",
+                  "example": "https://esigner.no/api/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44/start"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "email",
+                "status",
+                "signed_at",
+                "sign_url",
+                "sign_url_direct"
+              ]
+            },
+            "description": "In invitation order."
+          },
+          "payment": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "description": "subscription | balance | checkout | comped | test",
+                "example": "balance"
+              },
+              "amount_ore": {
+                "type": "integer",
+                "description": "What this request cost in minor units (øre), VAT included. 0 on a subscription, comped or in test mode.",
+                "example": 5800
+              },
+              "currency": {
+                "type": "string",
+                "example": "NOK"
+              }
+            },
+            "required": [
+              "method",
+              "amount_ore",
+              "currency"
+            ],
+            "description": "How this request was paid for."
+          },
+          "livemode": {
+            "type": "boolean",
+            "description": "false for signature requests created with an sk_test_ key."
+          },
+          "created": {
+            "type": "string",
+            "description": "ISO 8601.",
+            "example": "2026-07-13T10:12:00.000Z"
+          },
+          "payment_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Where to send the sender to pay, while `status` is `pending_payment`. null on a subscription-covered request, and once the payment has gone through. Safe to hand to a human at any time: it resumes the checkout if the request is still unpaid and lands on the status page if it isn't.",
+            "example": "https://esigner.no/api/orders/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/pay"
+          },
+          "signed_documents_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Where to list the signed PDFs, once `status` is `completed`. null before that. Requires the same API key — unlike the links in our completion email, this is not a public URL.",
+            "example": "https://esigner.no/api/v1/signature_requests/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/signed_documents"
+          },
+          "download_expires_at": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601. When the PUBLIC download links (the ones in the completion email and on the status page) stop working. The API download does not expire on it — your account keeps its archive — but treat it as the deadline for fetching and storing your own copy.",
+            "example": "2026-08-13T10:24:00.000Z"
+          },
+          "copy_emails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Addresses that receive the completion email with the signed PDF without being signers, as given in `copyEmails` on creation — lowercased, de-duplicated, and without the sender or any signer. Empty when none were given.",
+            "example": [
+              "regnskap@example.no"
+            ]
+          },
+          "return_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Where each signer is sent after the eID step, as given in `returnUrl`. `null` = our status page.",
+            "example": "https://app.example.com/contracts/123/signed"
+          },
+          "signing_eids": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            },
+            "description": "The eIDs the signing page offers on this request, as given in `signingEids` or resolved from your account and the deployment default. `null` = no restriction: every eID the signing provider has enabled is offered.",
+            "example": [
+              "no_bankid"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "status",
+          "document",
+          "signers",
+          "payment",
+          "livemode",
+          "created",
+          "payment_url",
+          "signed_documents_url",
+          "download_expires_at",
+          "copy_emails",
+          "return_url",
+          "signing_eids"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "A stable machine-readable code — see the error table. The upload endpoint's validation failures carry a human-readable sentence here instead.",
+            "example": "insufficient_scope"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable elaboration, when there is one."
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "SignedDocument": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "description": "0-based. Pass it to GET /signature_requests/{id}/signed_documents/{position}. In `merged` mode there is exactly one entry, position 0, covering every uploaded file; in `separate` mode there is one per upload, in upload order.",
+            "example": 0
+          },
+          "filename": {
+            "type": "string",
+            "example": "signert-avtale.pdf"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "null if the size could not be read.",
+            "example": 214016
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hex SHA-256 of the signed PDF, captured at completion. Verify your download against it.",
+            "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          },
+          "url": {
+            "type": "string",
+            "description": "Authenticated download for this file. Same API key, `application/pdf` in response.",
+            "example": "https://esigner.no/api/v1/signature_requests/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/signed_documents/0"
+          }
+        },
+        "required": [
+          "position",
+          "filename",
+          "size_bytes",
+          "sha256",
+          "url"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "enum": [
+              "event"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "document.completed | document.signing_failed | order.captured",
+            "example": "document.completed"
+          },
+          "livemode": {
+            "type": "boolean",
+            "description": "false for activity produced by an sk_test_ key."
+          },
+          "created": {
+            "type": "string",
+            "description": "ISO 8601. Also the pagination cursor — pass it as `cursor` to get the next page.",
+            "example": "2026-07-13T10:24:00.000Z"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "The same payload the webhook delivery carries for this event type."
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "type",
+          "livemode",
+          "created",
+          "data"
+        ]
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Pass this as `documentId` when you create the signature request."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Name of the first uploaded file.",
+            "example": "avtale.pdf"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "Total size across every uploaded file.",
+            "example": 184320
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "integer",
+                  "description": "0-based. Also the order the PDFs are merged in."
+                },
+                "filename": {
+                  "type": "string",
+                  "example": "vedlegg.pdf"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "example": 92160
+                }
+              },
+              "required": [
+                "position",
+                "filename",
+                "sizeBytes"
+              ]
+            },
+            "description": "One entry per uploaded PDF."
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "sizeBytes",
+          "attachments"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/signature_requests/{id}": {
+      "get": {
+        "summary": "Retrieve a signature request",
+        "description": "Poll this for status, or subscribe to `document.completed` and skip the polling.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:read"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The id returned by POST /signature_requests."
+            },
+            "required": true,
+            "description": "The id returned by POST /signature_requests.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signature request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureRequest"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account. The two are deliberately indistinguishable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests/{id}/cancel": {
+      "post": {
+        "summary": "Cancel a signature request",
+        "description": "Stops a request that nobody has signed yet. The signing links stop working and the request ends in `cancelled`.\n\n- **Subscription:** every signature it drew goes back to the quota — including signers added later.\n- **Pay-per-use:** the payment is returned (refunded if captured, released if only authorised).\n- **Test mode:** nothing was spent, so nothing comes back.\n\nOnce anyone has signed, it can no longer be cancelled (409 `already_signed`). A request that has **expired** cannot be cancelled, and the signatures it drew are **not** returned — cancel requests you know won't be signed rather than letting them lapse.\n\n**Correcting a mistake:** cancel, then create a new signature request. Pass the same `documentId` to reuse the upload, or upload the corrected file. It is counted once.\n\nIdempotent: cancelling a request that is already cancelled returns 200 with `already_cancelled: true` and returns nothing a second time.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional. Why it was cancelled — kept in the request's audit trail, never shown to the signers.",
+                    "example": "Wrong signer email — resending"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request is cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature_request": {
+                      "$ref": "#/components/schemas/SignatureRequest"
+                    },
+                    "already_cancelled": {
+                      "type": "boolean",
+                      "description": "True when an earlier call had already cancelled it. Nothing was returned by this call."
+                    },
+                    "released_signatures": {
+                      "type": "integer",
+                      "description": "Signatures returned to the subscription's quota by this call.",
+                      "example": 2
+                    },
+                    "refunded_ore": {
+                      "type": "integer",
+                      "description": "Pay-per-use amount no longer charged by this call, in minor units (øre), VAT included.",
+                      "example": 0
+                    },
+                    "returned_to_balance_ore": {
+                      "type": "integer",
+                      "description": "Amount put back on the prepaid balance by this call, in minor units (øre).",
+                      "example": 0
+                    }
+                  },
+                  "required": [
+                    "signature_request",
+                    "already_cancelled",
+                    "released_signatures",
+                    "refunded_ore",
+                    "returned_to_balance_ore"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`already_signed` — at least one signer has signed. `not_cancellable` — the request is no longer open (completed, expired, failed, or locked by an administrator).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`payment_reversal_failed` — the payment could not be returned, so the request was left open and nothing changed. Retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests/{id}/signed_documents": {
+      "get": {
+        "summary": "List the signed PDFs",
+        "description": "Available once `status` is `completed`. One entry in `merged` mode (the default), one per uploaded file in `separate` mode.\n\nPoll `GET /signature_requests/{id}` for `completed`, or subscribe to `document.completed` and come straight here.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "documents:read",
+          "orders:read"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed PDFs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SignedDocument"
+                      }
+                    },
+                    "download_expires_at": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "When the PUBLIC links expire. These API downloads do not — see the field on SignatureRequest."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "download_expires_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_completed` — not every signer has signed yet. `detail` names the current status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`gone` (the files have been deleted) or `revoked` (an administrator locked the document).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests/{id}/signed_documents/{position}": {
+      "get": {
+        "summary": "Download a signed PDF",
+        "description": "Returns `application/pdf` — the completed, eID-signed file, with the provider's attest page and its PAdES signature intact. Byte-for-byte what a signer downloads, so a signature check in any PDF reader (or at /kontroller-signatur) validates against it.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "documents:read",
+          "orders:read"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "description": "From the list endpoint. Always 0 in `merged` mode.",
+              "example": 0
+            },
+            "required": false,
+            "description": "From the list endpoint. Always 0 in `merged` mode.",
+            "name": "position",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ],
+              "description": "`1` sets `Content-Disposition: attachment` instead of `inline`."
+            },
+            "required": false,
+            "description": "`1` sets `Content-Disposition: attachment` instead of `inline`.",
+            "name": "download",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request or position, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_completed` — not every signer has signed yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`gone` or `revoked` — see the list endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/balance": {
+      "get": {
+        "summary": "Retrieve the prepaid balance",
+        "description": "What `paymentMethod: \"balance\"` draws from. Each top-up is spendable for 12 months; `lots` lists what is still spendable and when each part expires, oldest first — the order it is drawn in. A test-mode key always sees zero: test requests never touch the balance.",
+        "tags": [
+          "Balance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "billing:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "The balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "balance"
+                      ]
+                    },
+                    "livemode": {
+                      "type": "boolean"
+                    },
+                    "balance_ore": {
+                      "type": "integer",
+                      "description": "Spendable now, in minor units (øre).",
+                      "example": 120000
+                    },
+                    "currency": {
+                      "type": "string",
+                      "example": "NOK"
+                    },
+                    "lots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "remaining_ore": {
+                            "type": "integer"
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "ISO 8601."
+                          }
+                        },
+                        "required": [
+                          "remaining_ore",
+                          "expires_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "object",
+                    "livemode",
+                    "balance_ore",
+                    "currency",
+                    "lots"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/balance/transactions": {
+      "get": {
+        "summary": "List balance transactions",
+        "description": "Every movement on the prepaid balance, newest first: top-ups, draws for signature requests, money returned by a cancel, refunds and expiry. `amount_ore` is signed.",
+        "tags": [
+          "Balance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "billing:read"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "example": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The previous page's `next_cursor`."
+            },
+            "required": false,
+            "description": "The previous page's `next_cursor`.",
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "topup | draw | draw_return | withdrawal | withdrawal_reversal | refund | refund_reversal | expiry"
+                          },
+                          "amount_ore": {
+                            "type": "integer"
+                          },
+                          "balance_after_ore": {
+                            "type": "integer"
+                          },
+                          "signature_request_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "created": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "amount_ore",
+                          "balance_after_ore",
+                          "signature_request_id",
+                          "created"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "List events",
+        "description": "The same events delivered to your webhook endpoints, newest first. Useful for backfilling after downtime.",
+        "tags": [
+          "Events"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "webhooks:read",
+          "orders:read"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Page size. Defaults to 25.",
+              "example": 25
+            },
+            "required": false,
+            "description": "Page size. Defaults to 25.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Pass the previous page's `next_cursor` to continue. Returns events strictly older than it."
+            },
+            "required": false,
+            "description": "Pass the previous page's `next_cursor` to continue. Returns events strictly older than it.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Return only this event type.",
+              "example": "document.completed"
+            },
+            "required": false,
+            "description": "Return only this event type.",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "null on the last page. Otherwise pass it back as `cursor`."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "post": {
+        "summary": "Upload the PDF(s) to be signed",
+        "description": "Step one of every integration. Upload as `multipart/form-data`; the id you get back is what POST /signature_requests takes. An `sk_test_` key produces a test-mode document, and a test document can only ever be signed by a test key.",
+        "tags": [
+          "Documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "documents:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ownerEmail": {
+                    "type": "string",
+                    "description": "Where the receipt and the signed PDF are sent. Must contain an @.",
+                    "example": "post@firma.no"
+                  },
+                  "files": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The document. Repeat the field to upload several — they are merged in the order sent. PDF and Word (.docx) are accepted; a Word file is converted to PDF on upload. Older .doc, .odt and .rtf must be saved as .docx or PDF first. Per-file and per-request limits apply (25 MB per file, 10 files, by default)."
+                  },
+                  "templateSlug": {
+                    "type": "string",
+                    "description": "Optional. The /maler template the document was filled from — echoed on the completion surfaces.",
+                    "example": "leieavtale"
+                  }
+                },
+                "required": [
+                  "ownerEmail",
+                  "files"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The uploaded document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The upload failed validation — `error` carries the sentence, e.g. `pdf or word (.docx) files only`, `<name> must be saved as .docx or pdf first`, `ownerEmail required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`idempotency_key_in_progress` — the first request with this Idempotency-Key is still running. Retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "A file exceeded the per-file size limit, or converting it to PDF produced a file that does.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A Word file could not be converted to PDF — it is damaged or password-protected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Maintenance. New uploads and signature requests are paused; existing ones keep running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests": {
+      "post": {
+        "summary": "Create a signature request",
+        "description": "Sends the document to each signer for BankID/eID signing and returns the request in its initial state. Each signer is emailed (or texted) their own signing link.\n\nPass `useSubscription: true` to draw the signature from the account's quota: the invitations go out immediately and no money moves. Without it (and without `paymentMethod`) the request is created in `pending_payment` and the response carries a `payment_url` — send the sender there, and the invitations go out once they've paid. To pay without a payment page, name `paymentMethod`: `balance`, `card`, or `auto` for whatever the account pays with.\n\n**How the quota is drawn:** one signature per signer, taken when the request is created — not when it completes. The number of files doesn't matter. Cancel a request before anyone signs and they all come back (POST /signature_requests/{id}/cancel); an expired request keeps them. A document whose request was cancelled can be sent again with the same `documentId`.\n\nThe response carries each signer's own `sign_url` and `sign_url_direct`. Combine them with `notifySigners: false` to run the whole notification side yourself — see those fields.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "From POST /documents. Must belong to the same account as the key."
+                  },
+                  "signers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Shown in the invitation. The legal identity comes from the eID, not from this.",
+                          "example": "Ola Nordmann"
+                        },
+                        "email": {
+                          "type": "string",
+                          "example": "ola@example.no"
+                        },
+                        "phone": {
+                          "type": "string",
+                          "description": "E.164 or a local number, e.g. +47 912 34 567. Only honoured while SMS delivery is enabled for the account."
+                        }
+                      },
+                      "description": "Each signer needs at least one of `email` or `phone`."
+                    },
+                    "minItems": 1,
+                    "description": "At least one signer, invited in the order given. There is no upper limit."
+                  },
+                  "useSubscription": {
+                    "type": "boolean",
+                    "description": "Draw the signature from the account's quota instead of a payment. 409 `quota_exceeded` when the quota is spent. Equivalent to `paymentMethod: \"subscription\"`.",
+                    "example": true
+                  },
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "subscription",
+                      "balance",
+                      "card",
+                      "checkout"
+                    ],
+                    "description": "How to pay. Omitted: the request waits in `pending_payment` with a `payment_url`, unless `useSubscription: true` — the same as before this field existed, so an existing integration never starts spending quota or money without asking for it.\n\n- `subscription` — the quota. Same as `useSubscription: true`.\n- `balance` — the prepaid balance, at the pay-per-use price (signers × unit price, plus the SMS add-on when `smsDelivery` is on). The invitations go out immediately; 402 `insufficient_balance` when it doesn't cover the request. Check it with GET /balance.\n- `card` — the card saved under /konto/betaling, charged immediately at the pay-per-use price. A declined card refuses the request (402 `payment_method_declined`, or `payment_method_action_required` when the bank wants the customer present — the card then has to be saved again). Nothing is created for a declined card.\n- `checkout` — always a `payment_url`, even on an account with a subscription.\n- `auto` — whatever this account pays with: its subscription quota when it has one (never falling back to money when the quota runs out), else the way it chose under /konto/betaling. Never a checkout link: 409 `no_payment_method` when there is nothing to charge. Use it from a server that has no human to send to a payment page."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "merged",
+                      "separate"
+                    ],
+                    "description": "Sign the uploads as one merged PDF (default) or as separate documents."
+                  },
+                  "deadlineDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90,
+                    "description": "Days until the request expires. Defaults to the account's configured deadline.",
+                    "example": 14
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 64,
+                    "description": "Shared secret a signer must enter before the document is shown."
+                  },
+                  "includePasswordInEmail": {
+                    "type": "boolean",
+                    "description": "Whether that password is included in the invitation email. Defaults to true."
+                  },
+                  "smsDelivery": {
+                    "type": "boolean",
+                    "description": "Also text the signing link. Free on subscription-covered requests, a surcharge on pay-per-use. Defaults to **true** on a subscription (the quota includes it) and false otherwise — so pass `false` explicitly if you never want us to text your signers. A phone-only signer is texted regardless, since it is their only channel; to silence that too, use `notifySigners: false`."
+                  },
+                  "notifySigners": {
+                    "type": "boolean",
+                    "description": "Whether **we** message the signers at all: the invitation, its SMS, the reminder sequence and the completion email. Defaults to true.\n\nSet false when your own product owns the conversation — otherwise your customer receives two invitations, from two senders, for one signature. You then have to deliver `signers[].sign_url` (or `sign_url_direct`) yourself: with this off, that link is the only way anyone reaches the signing page."
+                  },
+                  "notifySender": {
+                    "type": "boolean",
+                    "description": "Whether we email the sender (`ownerEmail`) the receipt, the progress updates and the completed document. Defaults to true. The status and payment URLs are in this response and the signed PDF is downloadable over the API, so an integration loses nothing by turning it off."
+                  },
+                  "copyEmails": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "maxItems": 5,
+                    "description": "Up to five addresses that receive the completion email — the signed PDF attached, the download links, and Reply-To set to `ownerEmail` — without being a party to the signing: an accountant, a lawyer, the counterparty's office. They get no invitation and cannot sign. Lowercased and de-duplicated; the sender and the signers are dropped because they receive that email already. Read back as `copy_emails`.",
+                    "example": [
+                      "regnskap@example.no"
+                    ]
+                  },
+                  "returnUrl": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "format": "uri",
+                    "description": "Where each signer is sent after the eID step, instead of our status page — so they come back to your product. We add `signature_request_id` and `signer_id` as query parameters. Must be https; plain http is accepted with a test key, for localhost.\n\nThe redirect says **who** came back, not how it went: the signing page sends a signer here after a refusal too. Read the outcome from `GET /signature_requests/{id}` or the `signer.signed` / `signer.declined` webhooks. Read back as `return_url`.",
+                    "example": "https://app.example.com/contracts/123/signed"
+                  },
+                  "signingEids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "no_bankid",
+                        "se_bankid",
+                        "dk_mitid",
+                        "fi_ftn",
+                        "nl_idin",
+                        "uk_oneid",
+                        "de_personalausweis"
+                      ]
+                    },
+                    "maxItems": 10,
+                    "description": "Restrict which eIDs the signing page offers. `[\"no_bankid\"]` makes Norwegian BankID the only choice; no other method appears. Omitted or empty follows your account's stored choice (set under /konto), then the deployment default — which, unless the operator changed it, is no restriction: every eID the signing provider has enabled is offered.\n\nIds: `no_bankid` (Norway), `se_bankid` (Sweden), `dk_mitid` (Denmark), `fi_ftn` (Finland), `nl_idin` (the Netherlands), `uk_oneid` (the UK), `de_personalausweis` (Germany). `GET /config` lists the ones this deployment offers under `signingEids.available`; one it does not offer is refused with 400 `signing_eid_unavailable` rather than silently dropped. Read back as `signing_eids`.",
+                    "example": [
+                      "no_bankid"
+                    ]
+                  },
+                  "sealFooter": {
+                    "type": "boolean",
+                    "description": "Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, \"Forseglet via esigner\" on the right — the shape Posten's signing product uses. Off by default.\n\nThe band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.\n\n**It locks the signer roster.** The band has to go into the PDF before the eID hand-off, because a PAdES signature covers the whole file and nothing can be added afterwards; a signer added later would be missing from a roster already sealed inside the signed document. So `POST /orders/{id}/signers/*` returns 409 `seal_footer_locked` for the life of the request. Decide the signer list up front.\n\nThe band names each signer as `Name (email)` — or just the email or phone number when you gave no name — exactly what you supplied here. It carries no signing dates and no eID-verified legal names: those are only known after signing, and they are on the provider's attest page inside the same file. Only the copy sent for signing is stamped; the source PDF you uploaded is left untouched."
+                  }
+                },
+                "required": [
+                  "documentId",
+                  "signers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created signature request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`validation` — the request body failed schema validation. `issues` carries the field-level detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope`, or `cross_owner_document` — the document belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`quota_exceeded`, `no_subscription`, `topup_in_progress`, `topup_cooldown`, `document already has an order`, or `idempotency_key_in_progress`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`idempotency_key_reused` — the same Idempotency-Key was already used with a different request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`signing_failed` — the eID provider rejected the handoff. The document is left in `signing_failed` and the request can be retried.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Maintenance. New uploads and signature requests are paused; existing ones keep running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
