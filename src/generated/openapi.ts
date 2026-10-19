@@ -1085,7 +1085,7 @@ export interface components {
                  */
                 verifiedName: string | null;
                 /**
-                 * @description YYYY-MM-DD, as the signer's eID verified it.
+                 * @description YYYY-MM-DD, as the signer's eID verified it. Null for Swedish BankID, which issues none.
                  * @example 1990-01-31
                  */
                 verifiedBirthDate: string | null;
@@ -1256,7 +1256,7 @@ export interface components {
                  */
                 verified_name: string | null;
                 /**
-                 * @description The signer's date of birth (YYYY-MM-DD) as their eID verified it. Set at completion, like `verified_name`.
+                 * @description The signer's date of birth (YYYY-MM-DD) as their eID verified it. Set at completion, like `verified_name`. Always null for Swedish BankID, which does not issue a date of birth.
                  * @example 1990-01-31
                  */
                 verified_birth_date: string | null;
