@@ -844,7 +844,7 @@ export interface paths {
                             email?: string;
                             /** @description E.164 or a local number, e.g. +47 912 34 567. Only honoured while SMS delivery is enabled for the account. */
                             phone?: string;
-                            /** @description Lock this signer to a date of birth (YYYY-MM-DD). The eID provider compares it with the date of birth in the signer's BankID/MitID and refuses anyone else: they see an error in the signing window, and the request is unchanged, so the right person can still sign. Works with `sign_url` and `sign_url_direct`. While any signer is locked, the request is signed with the market's national eID only. Norway, Denmark, Sweden, Finland and Germany; elsewhere 400 `birthdate_lock_unsupported`. A malformed date is 400 `invalid_birthdate`. */
+                            /** @description Lock this signer to a date of birth (YYYY-MM-DD). The eID provider compares it with the date of birth in the signer's BankID/MitID and refuses anyone else: they see an error in the signing window, and the request is unchanged, so the right person can still sign. Works with `sign_url` and `sign_url_direct`. While any signer is locked, the request is signed with the market's national eID only. Norway, Denmark, Finland and Germany; elsewhere 400 `birthdate_lock_unsupported`. A malformed date is 400 `invalid_birthdate`. */
                             birthDate?: string;
                         }[];
                         /**
