@@ -844,6 +844,8 @@ export interface paths {
                             email?: string;
                             /** @description E.164 or a local number, e.g. +47 912 34 567. Only honoured while SMS delivery is enabled for the account. */
                             phone?: string;
+                            /** @description Lock this signer to a date of birth (YYYY-MM-DD). The eID provider compares it with the date of birth in the signer's BankID/MitID and refuses anyone else: they see an error in the signing window, and the request is unchanged, so the right person can still sign. Works with `sign_url` and `sign_url_direct`. While any signer is locked, the request is signed with the market's national eID only. Norway, Denmark and Finland; elsewhere 400 `birthdate_lock_unsupported`. A malformed date is 400 `invalid_birthdate`. */
+                            birthDate?: string;
                         }[];
                         /**
                          * @description Draw the signature from the account's quota instead of a payment. 409 `quota_exceeded` when the quota is spent. Equivalent to `paymentMethod: "subscription"`.
@@ -1077,6 +1079,21 @@ export interface components {
                  * @example 2026-07-13T10:24:00.000Z
                  */
                 signedAt: string | null;
+                /**
+                 * @description The name as the signer's eID verified it.
+                 * @example Ola Nordmann
+                 */
+                verifiedName: string | null;
+                /**
+                 * @description YYYY-MM-DD, as the signer's eID verified it.
+                 * @example 1990-01-31
+                 */
+                verifiedBirthDate: string | null;
+                /**
+                 * @description The date of birth the signer was locked to, or null.
+                 * @example 1990-01-31
+                 */
+                birthDateLock: string | null;
             }[];
         };
         DocumentSigningFailedData: {
@@ -1233,6 +1250,21 @@ export interface components {
                  * @example 2026-07-13T10:24:00.000Z
                  */
                 signed_at: string | null;
+                /**
+                 * @description The signer's name as their eID (BankID, MitID, …) verified it — not the `name` you sent. Set when the whole request is completed: the eID provider releases the evidence only then. null before that, and for a signature whose evidence carried no name.
+                 * @example Ola Nordmann
+                 */
+                verified_name: string | null;
+                /**
+                 * @description The signer's date of birth (YYYY-MM-DD) as their eID verified it. Set at completion, like `verified_name`.
+                 * @example 1990-01-31
+                 */
+                verified_birth_date: string | null;
+                /**
+                 * @description The date of birth this signer was locked to (`signers[].birthDate` at creation), or null.
+                 * @example 1990-01-31
+                 */
+                birth_date_lock: string | null;
                 /**
                  * @description This signer's private signing page — the document, the deadline, and the button that starts BankID/MitID. It is the same URL the invitation email carries, so it is safe to send even when we also mailed it; with `notifySigners: false` it is the ONLY copy that exists and you must deliver it yourself.
                  *
