@@ -728,6 +728,39 @@
             "description": "Where to send the sender to pay, while `status` is `pending_payment`. null on a subscription-covered request, and once the payment has gone through. Safe to hand to a human at any time: it resumes the checkout if the request is still unpaid and lands on the status page if it isn't.",
             "example": "https://esigner.no/api/orders/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/pay"
           },
+          "payment_required": {
+            "type": "boolean",
+            "description": "true while the request waits for a payment and **no signer has been invited**. The same condition as `status: \"pending_payment\"`, as a flag you can branch on: a 201 does not mean the invitations went out. Read `next_action` for what to do.",
+            "example": false
+          },
+          "next_action": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "pay"
+                ],
+                "description": "Always `pay` for now. Switch on it; other types may be added."
+              },
+              "url": {
+                "type": "string",
+                "description": "Same as `payment_url`.",
+                "example": "https://esigner.no/api/orders/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/pay"
+              },
+              "message": {
+                "type": "string",
+                "description": "A human-readable explanation, in English, safe to log or show a developer."
+              }
+            },
+            "required": [
+              "type",
+              "url",
+              "message"
+            ],
+            "description": "What has to happen before the request can proceed, or null when nothing does. Present exactly when `payment_required` is true. The hosted checkout behind `url` expires after a few minutes if nobody completes it; the URL itself does not, and opens a fresh checkout. To pay without a human, create the request with `paymentMethod: \"balance\"`, `\"card\"` or `\"auto\"` instead."
+          },
           "signed_documents_url": {
             "type": "string",
             "nullable": true,
@@ -778,6 +811,8 @@
           "livemode",
           "created",
           "payment_url",
+          "payment_required",
+          "next_action",
           "signed_documents_url",
           "download_expires_at",
           "copy_emails",
@@ -1935,7 +1970,7 @@
     "/signature_requests": {
       "post": {
         "summary": "Create a signature request",
-        "description": "Sends the document to each signer for BankID/eID signing and returns the request in its initial state. Each signer is emailed (or texted) their own signing link.\n\nPass `useSubscription: true` to draw the signature from the account's quota: the invitations go out immediately and no money moves. Without it (and without `paymentMethod`) the request is created in `pending_payment` and the response carries a `payment_url` — send the sender there, and the invitations go out once they've paid. To pay without a payment page, name `paymentMethod`: `balance`, `card`, or `auto` for whatever the account pays with.\n\n**How the quota is drawn:** one signature per signer, taken when the request is created — not when it completes. The number of files doesn't matter. Cancel a request before anyone signs and they all come back (POST /signature_requests/{id}/cancel); an expired request keeps them. A document whose request was cancelled can be sent again with the same `documentId`.\n\nThe response carries each signer's own `sign_url` and `sign_url_direct`. Combine them with `notifySigners: false` to run the whole notification side yourself — see those fields.",
+        "description": "Sends the document to each signer for BankID/eID signing and returns the request in its initial state. Each signer is emailed (or texted) their own signing link.\n\nPass `useSubscription: true` to draw the signature from the account's quota: the invitations go out immediately and no money moves. Without it (and without `paymentMethod`) the request is created in `pending_payment` and the response carries a `payment_url` — send the sender there, and the invitations go out once they've paid. That response is still a 201, so check `payment_required`: while it is true, nobody has been invited. To pay without a payment page, name `paymentMethod`: `balance`, `card`, or `auto` for whatever the account pays with.\n\n**How the quota is drawn:** one signature per signer, taken when the request is created — not when it completes. The number of files doesn't matter. Cancel a request before anyone signs and they all come back (POST /signature_requests/{id}/cancel); an expired request keeps them. A document whose request was cancelled can be sent again with the same `documentId`.\n\nThe response carries each signer's own `sign_url` and `sign_url_direct`. Combine them with `notifySigners: false` to run the whole notification side yourself — see those fields.",
         "tags": [
           "Signature requests"
         ],

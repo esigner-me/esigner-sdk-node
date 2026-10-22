@@ -809,7 +809,7 @@ export interface paths {
          * Create a signature request
          * @description Sends the document to each signer for BankID/eID signing and returns the request in its initial state. Each signer is emailed (or texted) their own signing link.
          *
-         *     Pass `useSubscription: true` to draw the signature from the account's quota: the invitations go out immediately and no money moves. Without it (and without `paymentMethod`) the request is created in `pending_payment` and the response carries a `payment_url` — send the sender there, and the invitations go out once they've paid. To pay without a payment page, name `paymentMethod`: `balance`, `card`, or `auto` for whatever the account pays with.
+         *     Pass `useSubscription: true` to draw the signature from the account's quota: the invitations go out immediately and no money moves. Without it (and without `paymentMethod`) the request is created in `pending_payment` and the response carries a `payment_url` — send the sender there, and the invitations go out once they've paid. That response is still a 201, so check `payment_required`: while it is true, nobody has been invited. To pay without a payment page, name `paymentMethod`: `balance`, `card`, or `auto` for whatever the account pays with.
          *
          *     **How the quota is drawn:** one signature per signer, taken when the request is created — not when it completes. The number of files doesn't matter. Cancel a request before anyone signs and they all come back (POST /signature_requests/{id}/cancel); an expired request keeps them. A document whose request was cancelled can be sent again with the same `documentId`.
          *
@@ -1307,6 +1307,26 @@ export interface components {
              * @example https://esigner.no/api/orders/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/pay
              */
             payment_url: string | null;
+            /**
+             * @description true while the request waits for a payment and **no signer has been invited**. The same condition as `status: "pending_payment"`, as a flag you can branch on: a 201 does not mean the invitations went out. Read `next_action` for what to do.
+             * @example false
+             */
+            payment_required: boolean;
+            /** @description What has to happen before the request can proceed, or null when nothing does. Present exactly when `payment_required` is true. The hosted checkout behind `url` expires after a few minutes if nobody completes it; the URL itself does not, and opens a fresh checkout. To pay without a human, create the request with `paymentMethod: "balance"`, `"card"` or `"auto"` instead. */
+            next_action: {
+                /**
+                 * @description Always `pay` for now. Switch on it; other types may be added.
+                 * @enum {string}
+                 */
+                type: "pay";
+                /**
+                 * @description Same as `payment_url`.
+                 * @example https://esigner.no/api/orders/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/pay
+                 */
+                url: string;
+                /** @description A human-readable explanation, in English, safe to log or show a developer. */
+                message: string;
+            } | null;
             /**
              * @description Where to list the signed PDFs, once `status` is `completed`. null before that. Requires the same API key — unlike the links in our completion email, this is not a public URL.
              * @example https://esigner.no/api/v1/signature_requests/3f7c1e42-9b0a-4d7e-8c31-2a5f6b9d0e11/signed_documents
