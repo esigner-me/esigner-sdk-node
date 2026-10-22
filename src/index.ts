@@ -173,7 +173,7 @@ export class Esigner {
   } & RequestOptions = {}): Promise<T> {
     const url = new URL(this.base + path);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.apiKey}`, "User-Agent": "esigner-sdk-js/0.1.0" };
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.apiKey}`, "User-Agent": "esigner-sdk-js/0.1.1" };
     if (method === "POST") headers["Idempotency-Key"] = opts.idempotencyKey ?? randomKey();
     if (opts.json !== undefined) headers["Content-Type"] = "application/json";
     const body = opts.form ?? (opts.json !== undefined ? JSON.stringify(opts.json) : undefined);
