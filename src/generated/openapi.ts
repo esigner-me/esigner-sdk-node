@@ -1241,7 +1241,7 @@ export interface components {
                  */
                 email: string | null;
                 /**
-                 * @description pending | notified | viewed | signed | declined | expired
+                 * @description pending | notified | viewed | signed | declined | expired | removed (taken off the request by our support so it could complete)
                  * @example signed
                  */
                 status: string;

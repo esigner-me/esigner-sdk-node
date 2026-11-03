@@ -633,7 +633,7 @@
                 },
                 "status": {
                   "type": "string",
-                  "description": "pending | notified | viewed | signed | declined | expired",
+                  "description": "pending | notified | viewed | signed | declined | expired | removed (taken off the request by our support so it could complete)",
                   "example": "signed"
                 },
                 "signed_at": {
