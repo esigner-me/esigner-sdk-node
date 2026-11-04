@@ -919,6 +919,90 @@
           "data"
         ]
       },
+      "DataProcessingAgreement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "enum": [
+              "data_processing_agreement"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "sent_for_signing",
+              "signed",
+              "closed"
+            ],
+            "description": "`received` — we have it and are reviewing it. `sent_for_signing` — the signing invitation is out to the contact person. `signed` — everyone has signed; the signed agreement went to the contact person by email. `closed` — withdrawn without a signature."
+          },
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "org_number": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "org_number"
+            ]
+          },
+          "contact": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "email"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "nullable": true,
+            "example": "nb-NO"
+          },
+          "requested_at": {
+            "type": "string",
+            "description": "ISO 8601."
+          },
+          "sent_for_signing_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "signed_at": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "status",
+          "company",
+          "contact",
+          "language",
+          "requested_at",
+          "sent_for_signing_at",
+          "signed_at"
+        ]
+      },
       "Document": {
         "type": "object",
         "properties": {
@@ -1776,6 +1860,244 @@
                   "required": [
                     "data",
                     "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data_processing_agreements": {
+      "post": {
+        "summary": "Request a data processing agreement",
+        "description": "Asks us for our data processing agreement (GDPR art. 28), with your company as controller and us as processor. Send who you are and who should sign; we prepare the agreement with those details, review it and send it for signing to `contact.email`, usually within one working day. When everyone has signed, the contact person gets the signed agreement by email. Poll `GET /data_processing_agreements` for the status.\n\nOnly the fields below are yours to fill; the rest of the text is our standard agreement. A key that belongs to a company account may leave out `company` — the account's own name and org number are used.\n\nOne open request per organisation: while one is not yet signed, asking again returns it (200) instead of creating a second. Not available with a test key.",
+        "tags": [
+          "Data processing agreements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "account:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "company": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "example": "Eksempel AS"
+                      },
+                      "org_number": {
+                        "type": "string",
+                        "minLength": 4,
+                        "maxLength": 40,
+                        "example": "912 345 678"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "org_number"
+                    ],
+                    "description": "The controller. Optional for a company account's key."
+                  },
+                  "contact": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "example": "Kari Nordmann"
+                      },
+                      "email": {
+                        "type": "string",
+                        "maxLength": 320,
+                        "format": "email",
+                        "example": "kari@eksempel.no"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email"
+                    ],
+                    "description": "The person who signs for the controller and receives the signed agreement."
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "nb-NO",
+                      "da-DK",
+                      "sv-SE",
+                      "fi-FI",
+                      "de-DE",
+                      "nl-NL",
+                      "en-GB"
+                    ],
+                    "description": "The agreement's language. Default: this market's."
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Optional documented instructions from the controller (clause on instructions). Plain text."
+                  }
+                },
+                "required": [
+                  "contact"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A request for this organisation was already open; it is returned unchanged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataProcessingAgreement"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The request was received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataProcessingAgreement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`validation` — see `issues`. `company_required` — a personal account's key must send `company`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`test_mode` — data processing agreements are real agreements; use a live key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List data processing agreements",
+        "description": "The agreements this account has requested, newest first, with where each one is.",
+        "tags": [
+          "Data processing agreements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "account:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "The requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DataProcessingAgreement"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
                   ]
                 }
               }

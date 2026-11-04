@@ -662,6 +662,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data_processing_agreements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List data processing agreements
+         * @description The agreements this account has requested, newest first, with where each one is.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The requests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["DataProcessingAgreement"][];
+                        };
+                    };
+                };
+                /** @description `unauthorized` — no API key, or it has been revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `insufficient_scope` — the key is valid but was not granted the scope this endpoint declares. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `too_many_requests` — rate limited. Retry after the `Retry-After` header. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Request a data processing agreement
+         * @description Asks us for our data processing agreement (GDPR art. 28), with your company as controller and us as processor. Send who you are and who should sign; we prepare the agreement with those details, review it and send it for signing to `contact.email`, usually within one working day. When everyone has signed, the contact person gets the signed agreement by email. Poll `GET /data_processing_agreements` for the status.
+         *
+         *     Only the fields below are yours to fill; the rest of the text is our standard agreement. A key that belongs to a company account may leave out `company` — the account's own name and org number are used.
+         *
+         *     One open request per organisation: while one is not yet signed, asking again returns it (200) instead of creating a second. Not available with a test key.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422. */
+                    "Idempotency-Key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The controller. Optional for a company account's key. */
+                        company?: {
+                            /** @example Eksempel AS */
+                            name: string;
+                            /** @example 912 345 678 */
+                            org_number: string;
+                        };
+                        /** @description The person who signs for the controller and receives the signed agreement. */
+                        contact: {
+                            /** @example Kari Nordmann */
+                            name: string;
+                            /**
+                             * Format: email
+                             * @example kari@eksempel.no
+                             */
+                            email: string;
+                        };
+                        /**
+                         * @description The agreement's language. Default: this market's.
+                         * @enum {string}
+                         */
+                        language?: "nb-NO" | "da-DK" | "sv-SE" | "fi-FI" | "de-DE" | "nl-NL" | "en-GB";
+                        /** @description Optional documented instructions from the controller (clause on instructions). Plain text. */
+                        instructions?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description A request for this organisation was already open; it is returned unchanged */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataProcessingAgreement"];
+                    };
+                };
+                /** @description The request was received */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataProcessingAgreement"];
+                    };
+                };
+                /** @description `validation` — see `issues`. `company_required` — a personal account's key must send `company`. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `unauthorized` — no API key, or it has been revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `test_mode` — data processing agreements are real agreements; use a live key. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `too_many_requests` — rate limited. Retry after the `Retry-After` header. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/documents": {
         parameters: {
             query?: never;
@@ -1411,6 +1583,31 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        DataProcessingAgreement: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            object: "data_processing_agreement";
+            /**
+             * @description `received` — we have it and are reviewing it. `sent_for_signing` — the signing invitation is out to the contact person. `signed` — everyone has signed; the signed agreement went to the contact person by email. `closed` — withdrawn without a signature.
+             * @enum {string}
+             */
+            status: "received" | "sent_for_signing" | "signed" | "closed";
+            company: {
+                name: string;
+                org_number: string;
+            };
+            contact: {
+                name: string;
+                email: string;
+            } | null;
+            /** @example nb-NO */
+            language: string | null;
+            /** @description ISO 8601. */
+            requested_at: string;
+            sent_for_signing_at: string | null;
+            signed_at: string | null;
         };
         Document: {
             /**

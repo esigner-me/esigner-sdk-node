@@ -27,6 +27,8 @@ export type CancelSignatureRequestResult = Ok<"/signature_requests/{id}/cancel",
 export type SignedDocumentList = Ok<"/signature_requests/{id}/signed_documents", "get">;
 export type Balance = Ok<"/balance", "get">;
 export type BalanceTransaction = Ok<"/balance/transactions", "get">["data"][number];
+export type DataProcessingAgreement = Schemas["DataProcessingAgreement"];
+export type RequestDataProcessingAgreementParams = JsonBody<"/data_processing_agreements", "post">;
 
 /** A webhook delivery, narrowed by `type` to the payload that event carries. */
 export type WebhookEvent = Omit<Schemas["WebhookEvent"], "type" | "data"> & (
@@ -138,6 +140,7 @@ export class Esigner {
   readonly documents: Documents;
   readonly signatureRequests: SignatureRequests;
   readonly balance: BalanceResource;
+  readonly dataProcessingAgreements: DataProcessingAgreements;
   readonly events: Events;
   /** Static too (`Esigner.webhooks`): verifying needs your endpoint secret, not an API key. */
   readonly webhooks = Webhooks;
@@ -161,6 +164,7 @@ export class Esigner {
     this.documents = new Documents(this);
     this.signatureRequests = new SignatureRequests(this);
     this.balance = new BalanceResource(this);
+    this.dataProcessingAgreements = new DataProcessingAgreements(this);
     this.events = new Events(this);
   }
 
@@ -284,6 +288,22 @@ class BalanceResource {
   /** Every transaction, newest first, fetching pages as you iterate. */
   allTransactions(params: { limit?: number } = {}): AsyncIterable<BalanceTransaction> {
     return paginate((cursor) => this.listTransactions({ ...params, cursor }));
+  }
+}
+
+/** Our data processing agreement (GDPR art. 28), asked for on your company's behalf. We review it and
+ *  send it for signing to `contact.email`; there is nothing to sign through the API. */
+class DataProcessingAgreements {
+  constructor(private readonly c: Esigner) {}
+
+  /** Ask for one. While a request for the organisation is open, the open one comes back instead. */
+  request(params: RequestDataProcessingAgreementParams, opts: RequestOptions = {}): Promise<DataProcessingAgreement> {
+    return this.c.request<DataProcessingAgreement>("POST", "/data_processing_agreements", { json: params, ...opts });
+  }
+
+  /** This account's requests, newest first, with where each one is. */
+  list(opts: RequestOptions = {}): Promise<Ok<"/data_processing_agreements", "get">> {
+    return this.c.request("GET", "/data_processing_agreements", opts);
   }
 }
 
