@@ -93,11 +93,6 @@
     },
     {
       "status": 400,
-      "code": "national_id_unavailable",
-      "meaning": "`nationalIdInSignature: true` was sent where it is not offered: outside Norway (only Norwegian BankID can carry the national identity number), or before the operator has switched it on. `GET /config` says `nationalIdInSignature`. Nothing was created."
-    },
-    {
-      "status": 400,
       "code": "signing_eid_unavailable",
       "meaning": "`signingEids` names an eID this deployment does not offer. `unavailable` lists them and `available` lists what you may use. Nothing was created."
     },
@@ -809,11 +804,6 @@
             "example": [
               "no_bankid"
             ]
-          },
-          "national_id_in_signature": {
-            "type": "boolean",
-            "description": "Whether each signature carries the signer's national identity number, as given in `nationalIdInSignature`. Present only where that option is offered (`GET /config` → `nationalIdInSignature`).",
-            "example": false
           }
         },
         "required": [
@@ -2463,11 +2453,6 @@
                     "example": [
                       "no_bankid"
                     ]
-                  },
-                  "nationalIdInSignature": {
-                    "type": "boolean",
-                    "description": "Norway only. Write each signer's fødselsnummer into their signature: Norwegian BankID puts it in the qualified signing certificate (extension 2.16.578.1.61.2.4) after the signer consents. Use it where the recipient must tie the signature to a national identity number — Statens vegvesen does for ownership changes. Off by default, because **everyone who receives the signed PDF can read the number**. Sent where it is not offered — outside Norway, or before the operator has enabled it (`GET /config` → `nationalIdInSignature`) — it is refused with 400 `national_id_unavailable`. Read back as `national_id_in_signature`.",
-                    "example": false
                   },
                   "sealFooter": {
                     "type": "boolean",
