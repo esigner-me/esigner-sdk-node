@@ -1086,6 +1086,11 @@ export interface paths {
                          */
                         signingEids?: ("no_bankid" | "se_bankid" | "dk_mitid" | "fi_ftn" | "nl_idin" | "uk_oneid" | "de_personalausweis")[];
                         /**
+                         * @description Norway only. Write each signer's fødselsnummer into their signature: Norwegian BankID puts it in the qualified signing certificate (extension 2.16.578.1.61.2.4) after the signer consents. Use it where the recipient must tie the signature to a national identity number — Statens vegvesen does for ownership changes. Off by default, because **everyone who receives the signed PDF can read the number**. Sent outside Norway it is refused with 400 `national_id_unavailable`. Read back as `national_id_in_signature`.
+                         * @example false
+                         */
+                        nationalIdInSignature?: boolean;
+                        /**
                          * @description Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, "Forseglet via esigner" on the right — the shape Posten's signing product uses. Off by default.
                          *
                          *     The band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.
@@ -1532,6 +1537,11 @@ export interface components {
              *     ]
              */
             signing_eids: string[] | null;
+            /**
+             * @description Whether each signature carries the signer's national identity number, as given in `nationalIdInSignature`.
+             * @example false
+             */
+            national_id_in_signature: boolean;
         };
         Error: {
             /**
