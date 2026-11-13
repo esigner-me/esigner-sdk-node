@@ -14,7 +14,7 @@
     {
       "status": 400,
       "code": "validation",
-      "meaning": "The request body failed schema validation. `issues` carries the field-level detail — each with a `path` and a `message`, e.g. `signer_needs_email_or_phone` at `[\"signers\", 0]` for a signer with neither `email` nor `phone` (required even with `notifySigners: false`). Nothing was created."
+      "meaning": "The request body failed schema validation. `issues` carries the field-level detail."
     },
     {
       "status": 401,
@@ -75,6 +75,11 @@
       "status": 400,
       "code": "invalid_return_url",
       "meaning": "`returnUrl` is not an absolute https URL (http only with a test key), or it carries credentials. `message` says which."
+    },
+    {
+      "status": 400,
+      "code": "signer_needs_email_or_phone",
+      "meaning": "A signer has no `name`, `email` or `phone`. `signer` is its 0-based index. Nothing was created."
     },
     {
       "status": 400,
@@ -628,7 +633,7 @@
                 "email": {
                   "type": "string",
                   "nullable": true,
-                  "description": "null for a signer reached only by SMS.",
+                  "description": "null for a signer reached only by SMS, or created with only a name (we contact that signer by no channel at all — see `sign_url`).",
                   "example": "ola@example.no"
                 },
                 "status": {
@@ -663,7 +668,7 @@
                 "sign_url": {
                   "type": "string",
                   "nullable": true,
-                  "description": "This signer's private signing page — the document, the deadline, and the button that starts BankID/MitID. It is the same URL the invitation email carries, so it is safe to send even when we also mailed it; with `notifySigners: false` it is the ONLY copy that exists and you must deliver it yourself.\n\n**Treat it as a credential**: the token in the path is what authorises the signature, so anyone holding the link can sign as that person. Send it to the signer, never anywhere public. null until the request has been handed to the eID provider (i.e. while it is still `pending_payment`), and on requests created before this field existed.",
+                  "description": "This signer's private signing page — the document, the deadline, and the button that starts BankID/MitID. It is the same URL the invitation email carries, so it is safe to send even when we also mailed it; with `notifySigners: false` it is the ONLY copy that exists and you must deliver it yourself.\n\nThe same goes for a signer you created with **only a name** (no `email`, no `phone`), whatever `notifySigners` says: we never invite, remind or send that signer the signed copy, so this link (or `sign_url_direct`) reaches them only if you deliver it. Afterwards, fetch the signed PDF for them from `GET /signature_requests/{id}/signed_documents`.\n\n**Treat it as a credential**: the token in the path is what authorises the signature, so anyone holding the link can sign as that person. Send it to the signer, never anywhere public. null until the request has been handed to the eID provider (i.e. while it is still `pending_payment`), and on requests created before this field existed.",
                   "example": "https://esigner.no/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44"
                 },
                 "sign_url_direct": {
@@ -2352,7 +2357,7 @@
                           "description": "Lock this signer to a date of birth (YYYY-MM-DD). The eID provider compares it with the date of birth in the signer's BankID/MitID and refuses anyone else: they see an error in the signing window, and the request is unchanged, so the right person can still sign. Works with `sign_url` and `sign_url_direct`. While any signer is locked, the request is signed with the market's national eID only. Norway, Denmark, Finland and Germany; elsewhere 400 `birthdate_lock_unsupported`. A malformed date is 400 `invalid_birthdate`."
                         }
                       },
-                      "description": "Each signer needs at least one of `email` or `phone`."
+                      "description": "Each signer needs a `name`, an `email` or a `phone`. We invite a signer by email and/or SMS when they have one. A signer with **only a name** is not contacted by us at all — not invited, reminded or sent the signed copy — and you deliver their `sign_url` (or `sign_url_direct`) from the response yourself. That works alongside `notifySigners: true`: the other signers on the request are still notified as usual."
                     },
                     "minItems": 1,
                     "description": "At least one signer, invited in the order given. There is no upper limit."
@@ -2404,7 +2409,7 @@
                   },
                   "notifySigners": {
                     "type": "boolean",
-                    "description": "Whether **we** message the signers at all: the invitation, its SMS, the reminder sequence and the completion email. Defaults to true.\n\nSet false when your own product owns the conversation — otherwise your customer receives two invitations, from two senders, for one signature. You then have to deliver `signers[].sign_url` (or `sign_url_direct`) yourself: with this off, that link is the only way anyone reaches the signing page."
+                    "description": "Whether **we** message the signers at all: the invitation, its SMS, the reminder sequence and the completion email. Defaults to true.\n\nSet false when your own product owns the conversation — otherwise your customer receives two invitations, from two senders, for one signature. You then have to deliver `signers[].sign_url` (or `sign_url_direct`) yourself: with this off, that link is the only way anyone reaches the signing page.\n\nA signer with only a name is never messaged even while this is true; see `signers`."
                   },
                   "notifySender": {
                     "type": "boolean",

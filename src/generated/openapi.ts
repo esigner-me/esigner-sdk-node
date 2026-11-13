@@ -1055,6 +1055,8 @@ export interface paths {
                          * @description Whether **we** message the signers at all: the invitation, its SMS, the reminder sequence and the completion email. Defaults to true.
                          *
                          *     Set false when your own product owns the conversation — otherwise your customer receives two invitations, from two senders, for one signature. You then have to deliver `signers[].sign_url` (or `sign_url_direct`) yourself: with this off, that link is the only way anyone reaches the signing page.
+                         *
+                         *     A signer with only a name is never messaged even while this is true; see `signers`.
                          */
                         notifySigners?: boolean;
                         /** @description Whether we email the sender (`ownerEmail`) the receipt, the progress updates and the completed document. Defaults to true. The status and payment URLs are in this response and the signed PDF is downloadable over the API, so an integration loses nothing by turning it off. */
@@ -1408,7 +1410,7 @@ export interface components {
                 /** @example Ola Nordmann */
                 name: string | null;
                 /**
-                 * @description null for a signer reached only by SMS.
+                 * @description null for a signer reached only by SMS, or created with only a name (we contact that signer by no channel at all — see `sign_url`).
                  * @example ola@example.no
                  */
                 email: string | null;
@@ -1439,6 +1441,8 @@ export interface components {
                 birth_date_lock: string | null;
                 /**
                  * @description This signer's private signing page — the document, the deadline, and the button that starts BankID/MitID. It is the same URL the invitation email carries, so it is safe to send even when we also mailed it; with `notifySigners: false` it is the ONLY copy that exists and you must deliver it yourself.
+                 *
+                 *     The same goes for a signer you created with **only a name** (no `email`, no `phone`), whatever `notifySigners` says: we never invite, remind or send that signer the signed copy, so this link (or `sign_url_direct`) reaches them only if you deliver it. Afterwards, fetch the signed PDF for them from `GET /signature_requests/{id}/signed_documents`.
                  *
                  *     **Treat it as a credential**: the token in the path is what authorises the signature, so anyone holding the link can sign as that person. Send it to the signer, never anywhere public. null until the request has been handed to the eID provider (i.e. while it is still `pending_payment`), and on requests created before this field existed.
                  * @example https://esigner.no/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44
