@@ -14,7 +14,7 @@
     {
       "status": 400,
       "code": "validation",
-      "meaning": "The request body failed schema validation. `issues` carries the field-level detail."
+      "meaning": "The request body failed schema validation. `issues` carries the field-level detail — each with a `path` and a `message`, e.g. `signer_needs_email_or_phone` at `[\"signers\", 0]` for a signer with neither `email` nor `phone` (required even with `notifySigners: false`). Nothing was created."
     },
     {
       "status": 401,
