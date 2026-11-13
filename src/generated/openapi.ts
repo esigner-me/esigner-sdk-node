@@ -1086,7 +1086,7 @@ export interface paths {
                          */
                         signingEids?: ("no_bankid" | "se_bankid" | "dk_mitid" | "fi_ftn" | "nl_idin" | "uk_oneid" | "de_personalausweis")[];
                         /**
-                         * @description Norway only. Write each signer's fødselsnummer into their signature: Norwegian BankID puts it in the qualified signing certificate (extension 2.16.578.1.61.2.4) after the signer consents. Use it where the recipient must tie the signature to a national identity number — Statens vegvesen does for ownership changes. Off by default, because **everyone who receives the signed PDF can read the number**. Sent outside Norway it is refused with 400 `national_id_unavailable`. Read back as `national_id_in_signature`.
+                         * @description Norway only. Write each signer's fødselsnummer into their signature: Norwegian BankID puts it in the qualified signing certificate (extension 2.16.578.1.61.2.4) after the signer consents. Use it where the recipient must tie the signature to a national identity number — Statens vegvesen does for ownership changes. Off by default, because **everyone who receives the signed PDF can read the number**. Sent where it is not offered — outside Norway, or before the operator has enabled it (`GET /config` → `nationalIdInSignature`) — it is refused with 400 `national_id_unavailable`. Read back as `national_id_in_signature`.
                          * @example false
                          */
                         nationalIdInSignature?: boolean;
@@ -1538,10 +1538,10 @@ export interface components {
              */
             signing_eids: string[] | null;
             /**
-             * @description Whether each signature carries the signer's national identity number, as given in `nationalIdInSignature`.
+             * @description Whether each signature carries the signer's national identity number, as given in `nationalIdInSignature`. Present only where that option is offered (`GET /config` → `nationalIdInSignature`).
              * @example false
              */
-            national_id_in_signature: boolean;
+            national_id_in_signature?: boolean;
         };
         Error: {
             /**
