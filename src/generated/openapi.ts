@@ -1086,6 +1086,13 @@ export interface paths {
                          */
                         signingEids?: ("no_bankid" | "se_bankid" | "dk_mitid" | "fi_ftn" | "nl_idin" | "uk_oneid" | "de_personalausweis")[];
                         /**
+                         * @description Sign the PDF exactly as you uploaded it. By default the file is saved again before signing (the content is kept; form fields and any existing signatures are removed) and the signing provider adds a page with the signature seals. With `preserveOriginal: true` nothing is re-saved, a signature or certification the file already carries is kept, and every party's signature is added on top of it — for a document someone else has already signed, such as the salgsmelding Statens vegvesen issues with its own seal. Off by default.
+                         *
+                         *     It excludes `sealFooter` and merging several files into one (400 `preserve_original_conflict`), and a test-mode request gets no test-mode cover page. If the signing provider cannot sign the file untouched, the request ends in `signing_failed` rather than signing an altered copy. Read back as `preserve_original`.
+                         * @example false
+                         */
+                        preserveOriginal?: boolean;
+                        /**
                          * @description Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, "Forseglet via esigner" on the right — the shape Posten's signing product uses. Off by default.
                          *
                          *     The band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.
@@ -1532,6 +1539,11 @@ export interface components {
              *     ]
              */
             signing_eids: string[] | null;
+            /**
+             * @description Whether the PDF is signed exactly as uploaded, as given in `preserveOriginal`.
+             * @example false
+             */
+            preserve_original: boolean;
         };
         Error: {
             /**

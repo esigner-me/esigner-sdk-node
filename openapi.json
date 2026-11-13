@@ -93,6 +93,11 @@
     },
     {
       "status": 400,
+      "code": "preserve_original_conflict",
+      "meaning": "`preserveOriginal: true` was combined with `sealFooter: true`, or with several files in `mode: \"merged\"` — both change the file. Nothing was created."
+    },
+    {
+      "status": 400,
       "code": "signing_eid_unavailable",
       "meaning": "`signingEids` names an eID this deployment does not offer. `unavailable` lists them and `available` lists what you may use. Nothing was created."
     },
@@ -804,6 +809,11 @@
             "example": [
               "no_bankid"
             ]
+          },
+          "preserve_original": {
+            "type": "boolean",
+            "description": "Whether the PDF is signed exactly as uploaded, as given in `preserveOriginal`.",
+            "example": false
           }
         },
         "required": [
@@ -822,7 +832,8 @@
           "download_expires_at",
           "copy_emails",
           "return_url",
-          "signing_eids"
+          "signing_eids",
+          "preserve_original"
         ]
       },
       "Error": {
@@ -2453,6 +2464,11 @@
                     "example": [
                       "no_bankid"
                     ]
+                  },
+                  "preserveOriginal": {
+                    "type": "boolean",
+                    "description": "Sign the PDF exactly as you uploaded it. By default the file is saved again before signing (the content is kept; form fields and any existing signatures are removed) and the signing provider adds a page with the signature seals. With `preserveOriginal: true` nothing is re-saved, a signature or certification the file already carries is kept, and every party's signature is added on top of it — for a document someone else has already signed, such as the salgsmelding Statens vegvesen issues with its own seal. Off by default.\n\nIt excludes `sealFooter` and merging several files into one (400 `preserve_original_conflict`), and a test-mode request gets no test-mode cover page. If the signing provider cannot sign the file untouched, the request ends in `signing_failed` rather than signing an altered copy. Read back as `preserve_original`.",
+                    "example": false
                   },
                   "sealFooter": {
                     "type": "boolean",
