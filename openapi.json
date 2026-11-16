@@ -148,6 +148,11 @@
     },
     {
       "status": 409,
+      "code": "preserve_original_locked",
+      "meaning": "Signers cannot be added to a request created with `preserveOriginal: true` — each signer's seal was given its place in the file at creation."
+    },
+    {
+      "status": 409,
       "code": "signer_roster_full",
       "meaning": "The request has room for no more signers: someone has already signed, and the signing provider sizes the signature pages before the first signature. Create a new request for the extra signers."
     },
@@ -2467,7 +2472,7 @@
                   },
                   "preserveOriginal": {
                     "type": "boolean",
-                    "description": "Sign the PDF exactly as you uploaded it. By default the file is saved again before signing (the content is kept; form fields and any existing signatures are removed) and the signing provider adds a page with the signature seals. With `preserveOriginal: true` nothing is re-saved, a signature or certification the file already carries is kept, and every party's signature is added on top of it — for a document someone else has already signed, such as the salgsmelding Statens vegvesen issues with its own seal. Off by default.\n\nIt excludes `sealFooter` and merging several files into one (400 `preserve_original_conflict`), and a test-mode request gets no test-mode cover page. If the signing provider cannot sign the file untouched, the request ends in `signing_failed` rather than signing an altered copy. Read back as `preserve_original`.",
+                    "description": "Sign the PDF exactly as you uploaded it. By default the file is saved again before signing (the content is kept; form fields and any existing signatures are removed) and the signing provider adds a page with the signature seals. With `preserveOriginal: true` nothing is re-saved, a signature or certification the file already carries is kept, and every party's signature is added on top of it — for a document someone else has already signed, such as the salgsmelding Statens vegvesen issues with its own seal. No page is added: each signer's seal is placed in a row along the foot of the last page, so leave that band empty. Off by default.\n\nIt excludes `sealFooter` and merging several files into one (400 `preserve_original_conflict`), a test-mode request gets no test-mode cover page, and the signer list is fixed at creation (adding a signer later is 409 `preserve_original_locked`). If the signing provider cannot sign the file untouched, the request ends in `signing_failed` rather than signing an altered copy. Read back as `preserve_original`.",
                     "example": false
                   },
                   "sealFooter": {
