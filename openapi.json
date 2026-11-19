@@ -172,6 +172,46 @@
       "meaning": "The eID provider could not be updated during a lock or unlock. A lock is kept on our side regardless; retry."
     },
     {
+      "status": 409,
+      "code": "not_in_progress",
+      "meaning": "The deadline can only be moved on a request that is `in_progress` — sent to its signers and not yet finished."
+    },
+    {
+      "status": 409,
+      "code": "already_completed",
+      "meaning": "The deadline of a completed request cannot be moved."
+    },
+    {
+      "status": 409,
+      "code": "already_expired",
+      "meaning": "The request has expired; its deadline cannot be moved. Create a new request."
+    },
+    {
+      "status": 409,
+      "code": "already_cancelled",
+      "meaning": "The request was cancelled or refunded; its deadline cannot be moved."
+    },
+    {
+      "status": 422,
+      "code": "deadline_shortening",
+      "meaning": "A deadline can only be moved later. The new one is earlier than the current `expires_at`."
+    },
+    {
+      "status": 422,
+      "code": "deadline_too_far",
+      "meaning": "The new deadline is more than 90 days from now."
+    },
+    {
+      "status": 400,
+      "code": "invalid_deadline",
+      "meaning": "Send exactly one of `days` and `expires_at`."
+    },
+    {
+      "status": 502,
+      "code": "deadline_extend_failed",
+      "meaning": "The eID provider refused to extend the request. Nothing changed; retry."
+    },
+    {
       "status": 410,
       "code": "revoked",
       "meaning": "This document is locked — by its sender or by an administrator."
@@ -840,6 +880,12 @@
             "nullable": true,
             "description": "ISO 8601 time it was locked, or null.",
             "example": null
+          },
+          "expires_at": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601. The signing deadline: a signer who has not signed by then no longer can, and the request ends in `expired`. Set from `deadlineDays` at creation; move it later with POST /signature_requests/{id}/deadline. null on a draft.",
+            "example": "2026-07-27T10:12:00.000Z"
           }
         },
         "required": [
@@ -861,7 +907,8 @@
           "signing_eids",
           "preserve_original",
           "locked",
-          "locked_at"
+          "locked_at",
+          "expires_at"
         ]
       },
       "Error": {
@@ -1611,6 +1658,182 @@
           },
           "502": {
             "description": "`signing_lock_failed` — the eID provider could not be updated. A lock is kept on our side regardless; retry to finish it. An unlock changed nothing; retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests/{id}/deadline": {
+      "post": {
+        "summary": "Extend the signing deadline",
+        "description": "Gives the signers more time on a request that is already `in_progress` — for instance when a counterparty is away. Send **exactly one** of `days` (counted from now) or `expires_at` (an exact moment). The new deadline must be later than the current `expires_at` and at most 90 days from now; a deadline can only be moved later, never earlier.\n\nThe signing links stay the same, and the eID provider's order is extended too. Reminders follow the new date, including the last-day notice. Nothing is charged.\n\nIdempotent: asking for the deadline the request already has returns 200 with `unchanged: true`. With `days`, a retry computes from the new now — send an `Idempotency-Key` to replay the first answer instead.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 36500,
+                    "description": "The new deadline as whole days from now. At most 90.",
+                    "example": 30
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The new deadline as an exact ISO 8601 moment, with a time zone. At most 90 days from now.",
+                    "example": "2026-08-31T21:59:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The deadline was moved. `signature_request.expires_at` is the new one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature_request": {
+                      "$ref": "#/components/schemas/SignatureRequest"
+                    },
+                    "previous_expires_at": {
+                      "type": "string",
+                      "description": "ISO 8601. The deadline before this call.",
+                      "example": "2026-07-27T10:12:00.000Z"
+                    },
+                    "unchanged": {
+                      "type": "boolean",
+                      "description": "True when the request already had this deadline. Nothing was changed."
+                    }
+                  },
+                  "required": [
+                    "signature_request",
+                    "previous_expires_at",
+                    "unchanged"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`validation` — the body failed schema validation. `invalid_deadline` — send exactly one of `days` and `expires_at`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_in_progress` — the request has not been sent to its signers yet (draft, unpaid, or the hand-off failed). `already_completed`, `already_expired`, `already_cancelled` — the request is closed; an expired request cannot be reopened, create a new one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`deadline_shortening` — the new deadline is earlier than the current one. `deadline_too_far` — it is more than 90 days from now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`deadline_extend_failed` — the eID provider refused the extension. Nothing changed; retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2705,7 +2928,7 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 90,
-                    "description": "Days until the request expires. Defaults to the account's configured deadline.",
+                    "description": "Signing deadline: whole days from now until the request expires, 1 to 90. Signers who have not signed by then can no longer sign. Omit it for the standard deadline — 14 days unless the operator has set another default for this market.",
                     "example": 14
                   },
                   "password": {

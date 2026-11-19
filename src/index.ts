@@ -25,6 +25,8 @@ export type ApiEvent = Schemas["Event"];
 export type CreateSignatureRequestParams = JsonBody<"/signature_requests", "post">;
 export type CancelSignatureRequestResult = Ok<"/signature_requests/{id}/cancel", "post">;
 export type LockSignatureRequestResult = Ok<"/signature_requests/{id}/lock", "post">;
+export type ExtendDeadlineParams = JsonBody<"/signature_requests/{id}/deadline", "post">;
+export type ExtendDeadlineResult = Ok<"/signature_requests/{id}/deadline", "post">;
 export type SignedDocumentList = Ok<"/signature_requests/{id}/signed_documents", "get">;
 export type Balance = Ok<"/balance", "get">;
 export type BalanceTransaction = Ok<"/balance/transactions", "get">["data"][number];
@@ -178,7 +180,7 @@ export class Esigner {
   } & RequestOptions = {}): Promise<T> {
     const url = new URL(this.base + path);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.apiKey}`, "User-Agent": "esigner-sdk-js/0.2.0" };
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.apiKey}`, "User-Agent": "esigner-sdk-js/0.3.0" };
     if (method === "POST") headers["Idempotency-Key"] = opts.idempotencyKey ?? randomKey();
     if (opts.json !== undefined) headers["Content-Type"] = "application/json";
     const body = opts.form ?? (opts.json !== undefined ? JSON.stringify(opts.json) : undefined);
@@ -272,6 +274,22 @@ class SignatureRequests {
   /** Lift a lock (yours or an administrator's); the same signing links work again. */
   unlock(id: string, params: { reason?: string } = {}, opts: RequestOptions = {}): Promise<LockSignatureRequestResult> {
     return this.c.request("POST", `/signature_requests/${encodeURIComponent(id)}/unlock`, { json: params, ...opts });
+  }
+
+  /**
+   * Give the signers more time: move an `in_progress` request's deadline later, as `days` from now or
+   * an exact `expires_at`. Later only, at most 90 days out; the signing links stay the same.
+   * A `Date` for `expires_at` is sent as its ISO string.
+   */
+  extendDeadline(
+    id: string,
+    params: { days: number; expires_at?: never } | { expires_at: string | Date; days?: never },
+    opts: RequestOptions = {},
+  ): Promise<ExtendDeadlineResult> {
+    const json: ExtendDeadlineParams = params.days !== undefined
+      ? { days: params.days }
+      : { expires_at: params.expires_at instanceof Date ? params.expires_at.toISOString() : params.expires_at! };
+    return this.c.request("POST", `/signature_requests/${encodeURIComponent(id)}/deadline`, { json, ...opts });
   }
 
   /** The signed PDF(s) of a completed request, with their positions. */

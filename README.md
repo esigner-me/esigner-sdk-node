@@ -89,6 +89,17 @@ Or cancel before anyone has signed — whatever the request drew comes back:
 await esigner.signatureRequests.cancel(request.id, { reason: "Wrong version" });
 ```
 
+Need more time? Move the signing deadline later — up to 90 days from now. The signing links stay
+the same, and `expires_at` on the request is the new deadline:
+
+```ts
+await esigner.signatureRequests.extendDeadline(request.id, { days: 30 });
+// or an exact moment
+await esigner.signatureRequests.extendDeadline(request.id, { expires_at: new Date("2026-12-31T16:00:00Z") });
+```
+
+Set the deadline at creation with `deadlineDays` (1–90; the market's default, usually 14, when left out).
+
 ## Webhooks
 
 esigner signs every delivery with `Esigner-Signature: t=<unix>,v1=<hmac>`. Verify it against the

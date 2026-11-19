@@ -33,6 +33,19 @@ describe("requests", () => {
     expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ documentId: "doc_1", signingEids: ["se_bankid"] });
   });
 
+  it("extends the deadline with days or an exact moment", async () => {
+    const { f, calls } = fakeFetch([
+      json(200, { signature_request: { id: "req_1" }, previous_expires_at: "x", unchanged: false }),
+      json(200, { signature_request: { id: "req_1" }, previous_expires_at: "x", unchanged: false }),
+    ]);
+    const es = new Esigner("sk_test_abc", { fetch: f });
+    await es.signatureRequests.extendDeadline("req_1", { days: 30 });
+    await es.signatureRequests.extendDeadline("req_1", { expires_at: new Date("2026-12-31T16:00:00Z") });
+    expect(calls[0]!.url.href).toBe(`${MARKETS.no}/signature_requests/req_1/deadline`);
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ days: 30 });
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ expires_at: "2026-12-31T16:00:00.000Z" });
+  });
+
   it("retries a 503 and a network error with the SAME idempotency key, then succeeds", async () => {
     const { f, calls } = fakeFetch([json(503, { error: "maintenance" }), new TypeError("fetch failed"), json(201, { id: "req_2" })]);
     const es = new Esigner("sk_test_abc", { fetch: f, maxRetries: 2 });

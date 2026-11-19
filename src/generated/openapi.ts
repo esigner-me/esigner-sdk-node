@@ -441,6 +441,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/signature_requests/{id}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend the signing deadline
+         * @description Gives the signers more time on a request that is already `in_progress` — for instance when a counterparty is away. Send **exactly one** of `days` (counted from now) or `expires_at` (an exact moment). The new deadline must be later than the current `expires_at` and at most 90 days from now; a deadline can only be moved later, never earlier.
+         *
+         *     The signing links stay the same, and the eID provider's order is extended too. Reminders follow the new date, including the last-day notice. Nothing is charged.
+         *
+         *     Idempotent: asking for the deadline the request already has returns 200 with `unchanged: true`. With `days`, a retry computes from the new now — send an `Idempotency-Key` to replay the first answer instead.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422. */
+                    "Idempotency-Key"?: string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description The new deadline as whole days from now. At most 90.
+                         * @example 30
+                         */
+                        days?: number;
+                        /**
+                         * Format: date-time
+                         * @description The new deadline as an exact ISO 8601 moment, with a time zone. At most 90 days from now.
+                         * @example 2026-08-31T21:59:00.000Z
+                         */
+                        expires_at?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The deadline was moved. `signature_request.expires_at` is the new one. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            signature_request: components["schemas"]["SignatureRequest"];
+                            /**
+                             * @description ISO 8601. The deadline before this call.
+                             * @example 2026-07-27T10:12:00.000Z
+                             */
+                            previous_expires_at: string;
+                            /** @description True when the request already had this deadline. Nothing was changed. */
+                            unchanged: boolean;
+                        };
+                    };
+                };
+                /** @description `validation` — the body failed schema validation. `invalid_deadline` — send exactly one of `days` and `expires_at`. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `unauthorized` — no API key, or it has been revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `insufficient_scope` — the key is valid but was not granted the scope this endpoint declares. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `not_found` — no such signature request, or it belongs to another account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `not_in_progress` — the request has not been sent to its signers yet (draft, unpaid, or the hand-off failed). `already_completed`, `already_expired`, `already_cancelled` — the request is closed; an expired request cannot be reopened, create a new one. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `deadline_shortening` — the new deadline is earlier than the current one. `deadline_too_far` — it is more than 90 days from now. */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `too_many_requests` — rate limited. Retry after the `Retry-After` header. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `deadline_extend_failed` — the eID provider refused the extension. Nothing changed; retry. */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/signature_requests/{id}/signed_documents": {
         parameters: {
             query?: never;
@@ -1263,7 +1408,7 @@ export interface paths {
                          */
                         mode?: "merged" | "separate";
                         /**
-                         * @description Days until the request expires. Defaults to the account's configured deadline.
+                         * @description Signing deadline: whole days from now until the request expires, 1 to 90. Signers who have not signed by then can no longer sign. Omit it for the standard deadline — 14 days unless the operator has set another default for this market.
                          * @example 14
                          */
                         deadlineDays?: number;
@@ -1776,6 +1921,11 @@ export interface components {
              * @example null
              */
             locked_at: string | null;
+            /**
+             * @description ISO 8601. The signing deadline: a signer who has not signed by then no longer can, and the request ends in `expired`. Set from `deadlineDays` at creation; move it later with POST /signature_requests/{id}/deadline. null on a draft.
+             * @example 2026-07-27T10:12:00.000Z
+             */
+            expires_at: string | null;
         };
         Error: {
             /**
