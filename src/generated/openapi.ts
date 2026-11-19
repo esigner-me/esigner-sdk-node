@@ -219,6 +219,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/signature_requests/{id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a signature request
+         * @description Stops a request from going any further without cancelling it — for instance when something in the contract turns out to be wrong and it must not end up fully signed. While locked, the signing links stop working, nobody can sign, and the document and the signed PDF cannot be downloaded. Signatures already made stay. Nothing is refunded or returned to the quota: to get the signatures back on a request nobody has signed, use POST /signature_requests/{id}/cancel.
+         *
+         *     Works on `in_progress` and `completed` requests. Idempotent: locking a locked request returns 200. Undo with POST /signature_requests/{id}/unlock.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422. */
+                    "Idempotency-Key"?: string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Optional. Why — kept in the request's audit trail, never shown to the signers.
+                         * @example Wrong rent in § 3 — correcting before anyone else signs
+                         */
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The request is locked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            signature_request: components["schemas"]["SignatureRequest"];
+                        };
+                    };
+                };
+                /** @description `unauthorized` — no API key, or it has been revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `insufficient_scope` — the key is valid but was not granted the scope this endpoint declares. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `not_found` — no such signature request, or it belongs to another account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `order_closed` — only `in_progress` and `completed` requests can be locked or unlocked (not drafts, unpaid, cancelled, expired, failed or refunded ones, or one whose files are deleted). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `too_many_requests` — rate limited. Retry after the `Retry-After` header. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `signing_lock_failed` — the eID provider could not be updated. A lock is kept on our side regardless; retry to finish it. An unlock changed nothing; retry. */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/signature_requests/{id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock a signature request
+         * @description Lifts a lock, set by you or by an administrator, and lets the request continue where it stopped: the same signing links work again. Idempotent: unlocking a request that is not locked returns 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422. */
+                    "Idempotency-Key"?: string;
+                };
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Optional. Why — kept in the request's audit trail, never shown to the signers.
+                         * @example Corrected
+                         */
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The request is unlocked */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            signature_request: components["schemas"]["SignatureRequest"];
+                        };
+                    };
+                };
+                /** @description `unauthorized` — no API key, or it has been revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `insufficient_scope` — the key is valid but was not granted the scope this endpoint declares. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `not_found` — no such signature request, or it belongs to another account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `order_closed` — only `in_progress` and `completed` requests can be locked or unlocked (not drafts, unpaid, cancelled, expired, failed or refunded ones, or one whose files are deleted). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `too_many_requests` — rate limited. Retry after the `Retry-After` header. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `signing_lock_failed` — the eID provider could not be updated. A lock is kept on our side regardless; retry to finish it. An unlock changed nothing; retry. */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/signature_requests/{id}/signed_documents": {
         parameters: {
             query?: never;
@@ -292,7 +514,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description `gone` (the files have been deleted) or `revoked` (an administrator locked the document). */
+                /** @description `gone` (the files have been deleted) or `revoked` (the document is locked — by you or by an administrator). */
                 410: {
                     headers: {
                         [name: string]: unknown;
@@ -1544,6 +1766,16 @@ export interface components {
              * @example false
              */
             preserve_original: boolean;
+            /**
+             * @description True while the request is locked — by you (POST /signature_requests/{id}/lock) or by an administrator. Nobody can sign and nothing can be downloaded until it is unlocked.
+             * @example false
+             */
+            locked: boolean;
+            /**
+             * @description ISO 8601 time it was locked, or null.
+             * @example null
+             */
+            locked_at: string | null;
         };
         Error: {
             /**

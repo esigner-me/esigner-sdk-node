@@ -162,6 +162,16 @@
       "meaning": "The files behind this signature request have been deleted."
     },
     {
+      "status": 409,
+      "code": "order_closed",
+      "meaning": "Lock or unlock was refused: only `in_progress` and `completed` requests can be locked."
+    },
+    {
+      "status": 502,
+      "code": "signing_lock_failed",
+      "meaning": "The eID provider could not be updated during a lock or unlock. A lock is kept on our side regardless; retry."
+    },
+    {
       "status": 410,
       "code": "revoked",
       "meaning": "This document is locked — by its sender or by an administrator."
@@ -819,6 +829,17 @@
             "type": "boolean",
             "description": "Whether the PDF is signed exactly as uploaded, as given in `preserveOriginal`.",
             "example": false
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True while the request is locked — by you (POST /signature_requests/{id}/lock) or by an administrator. Nobody can sign and nothing can be downloaded until it is unlocked.",
+            "example": false
+          },
+          "locked_at": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601 time it was locked, or null.",
+            "example": null
           }
         },
         "required": [
@@ -838,7 +859,9 @@
           "copy_emails",
           "return_url",
           "signing_eids",
-          "preserve_original"
+          "preserve_original",
+          "locked",
+          "locked_at"
         ]
       },
       "Error": {
@@ -1323,6 +1346,282 @@
         }
       }
     },
+    "/signature_requests/{id}/lock": {
+      "post": {
+        "summary": "Lock a signature request",
+        "description": "Stops a request from going any further without cancelling it — for instance when something in the contract turns out to be wrong and it must not end up fully signed. While locked, the signing links stop working, nobody can sign, and the document and the signed PDF cannot be downloaded. Signatures already made stay. Nothing is refunded or returned to the quota: to get the signatures back on a request nobody has signed, use POST /signature_requests/{id}/cancel.\n\nWorks on `in_progress` and `completed` requests. Idempotent: locking a locked request returns 200. Undo with POST /signature_requests/{id}/unlock.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional. Why — kept in the request's audit trail, never shown to the signers.",
+                    "example": "Wrong rent in § 3 — correcting before anyone else signs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request is locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature_request": {
+                      "$ref": "#/components/schemas/SignatureRequest"
+                    }
+                  },
+                  "required": [
+                    "signature_request"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`order_closed` — only `in_progress` and `completed` requests can be locked or unlocked (not drafts, unpaid, cancelled, expired, failed or refunded ones, or one whose files are deleted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`signing_lock_failed` — the eID provider could not be updated. A lock is kept on our side regardless; retry to finish it. An unlock changed nothing; retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signature_requests/{id}/unlock": {
+      "post": {
+        "summary": "Unlock a signature request",
+        "description": "Lifts a lock, set by you or by an administrator, and lets the request continue where it stopped: the same signing links work again. Idempotent: unlocking a request that is not locked returns 200.",
+        "tags": [
+          "Signature requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-scopes": [
+          "orders:write"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+              "example": "9f1c0f4e-3d2b-4a71-9f3a-1c0e5b8d2a44"
+            },
+            "required": false,
+            "description": "Makes the write retry-safe: a retry with the same key replays the original response instead of creating a second signature request. Same key + a different body is a 422.",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional. Why — kept in the request's audit trail, never shown to the signers.",
+                    "example": "Corrected"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request is unlocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature_request": {
+                      "$ref": "#/components/schemas/SignatureRequest"
+                    }
+                  },
+                  "required": [
+                    "signature_request"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`unauthorized` — no API key, or it has been revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`insufficient_scope` — the key is valid but was not granted the scope this endpoint declares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` — no such signature request, or it belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`order_closed` — only `in_progress` and `completed` requests can be locked or unlocked (not drafts, unpaid, cancelled, expired, failed or refunded ones, or one whose files are deleted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_requests` — rate limited. Retry after the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`signing_lock_failed` — the eID provider could not be updated. A lock is kept on our side regardless; retry to finish it. An unlock changed nothing; retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/signature_requests/{id}/signed_documents": {
       "get": {
         "summary": "List the signed PDFs",
@@ -1419,7 +1718,7 @@
             }
           },
           "410": {
-            "description": "`gone` (the files have been deleted) or `revoked` (an administrator locked the document).",
+            "description": "`gone` (the files have been deleted) or `revoked` (the document is locked — by you or by an administrator).",
             "content": {
               "application/json": {
                 "schema": {

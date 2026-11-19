@@ -24,6 +24,7 @@ export type SignedDocument = Schemas["SignedDocument"];
 export type ApiEvent = Schemas["Event"];
 export type CreateSignatureRequestParams = JsonBody<"/signature_requests", "post">;
 export type CancelSignatureRequestResult = Ok<"/signature_requests/{id}/cancel", "post">;
+export type LockSignatureRequestResult = Ok<"/signature_requests/{id}/lock", "post">;
 export type SignedDocumentList = Ok<"/signature_requests/{id}/signed_documents", "get">;
 export type Balance = Ok<"/balance", "get">;
 export type BalanceTransaction = Ok<"/balance/transactions", "get">["data"][number];
@@ -261,6 +262,16 @@ class SignatureRequests {
   /** Stop a request before anyone has signed; whatever it drew (quota, payment) comes back. */
   cancel(id: string, params: { reason?: string } = {}, opts: RequestOptions = {}): Promise<CancelSignatureRequestResult> {
     return this.c.request("POST", `/signature_requests/${encodeURIComponent(id)}/cancel`, { json: params, ...opts });
+  }
+
+  /** Pause a request so nobody can sign or download it, without cancelling it. Undo with `unlock`. */
+  lock(id: string, params: { reason?: string } = {}, opts: RequestOptions = {}): Promise<LockSignatureRequestResult> {
+    return this.c.request("POST", `/signature_requests/${encodeURIComponent(id)}/lock`, { json: params, ...opts });
+  }
+
+  /** Lift a lock (yours or an administrator's); the same signing links work again. */
+  unlock(id: string, params: { reason?: string } = {}, opts: RequestOptions = {}): Promise<LockSignatureRequestResult> {
+    return this.c.request("POST", `/signature_requests/${encodeURIComponent(id)}/unlock`, { json: params, ...opts });
   }
 
   /** The signed PDF(s) of a completed request, with their positions. */
