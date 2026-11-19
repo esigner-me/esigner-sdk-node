@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://esigner.no">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/esigner-me/esigner-sdk-php/main/art/esigner-mark.svg">
+      <source media="(prefers-color-scheme: dark)" srcset="https://esigner.no/logo-dark.svg">
       <img src="https://esigner.no/logo.svg" alt="esigner" height="64">
     </picture>
   </a>
