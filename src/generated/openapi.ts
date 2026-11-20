@@ -1460,7 +1460,7 @@ export interface paths {
                          */
                         preserveOriginal?: boolean;
                         /**
-                         * @description Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, "Forseglet via esigner" on the right — the shape Posten's signing product uses. Off by default.
+                         * @description Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, "Forseglet via Esigner" on the right — the shape Posten's signing product uses. Off by default.
                          *
                          *     The band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.
                          *
@@ -1823,7 +1823,7 @@ export interface components {
                  */
                 sign_url: string | null;
                 /**
-                 * @description Same signer, one step shorter: a redirect that takes them straight into BankID/MitID with no esigner page in between. For a flow whose own UI already showed the document and collected the approval click.
+                 * @description Same signer, one step shorter: a redirect that takes them straight into BankID/MitID with no Esigner page in between. For a flow whose own UI already showed the document and collected the approval click.
                  *
                  *     Falls back to `sign_url` by redirecting there whenever it cannot skip — the request is password-protected, expired, cancelled, or the eID hand-off has not finished — so it is always safe to link. Note the signer then never sees the document on OUR surface: in the hosted eID flow the provider still presents it before signing, so use this when your own product has already put the document in front of them.
                  * @example https://esigner.no/api/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44/start

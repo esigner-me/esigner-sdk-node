@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "esigner API",
+    "title": "Esigner API",
     "version": "1.0.0",
     "description": "Create BankID/eID signature requests and receive signed PDFs.\n\nAuthenticate with an API key: `Authorization: Bearer sk_live_…`. Test-mode keys (`sk_test_…`) run against the provider sandbox and never consume quota or move money.\n\nPOSTs accept an `Idempotency-Key` header — retrying with the same key replays the original response rather than creating a second signature request.\n\nEvents are delivered to webhook endpoints, signed with `Esigner-Signature: t=<unix>,v1=<hmac>`."
   },
@@ -734,7 +734,7 @@
                 "sign_url_direct": {
                   "type": "string",
                   "nullable": true,
-                  "description": "Same signer, one step shorter: a redirect that takes them straight into BankID/MitID with no esigner page in between. For a flow whose own UI already showed the document and collected the approval click.\n\nFalls back to `sign_url` by redirecting there whenever it cannot skip — the request is password-protected, expired, cancelled, or the eID hand-off has not finished — so it is always safe to link. Note the signer then never sees the document on OUR surface: in the hosted eID flow the provider still presents it before signing, so use this when your own product has already put the document in front of them.",
+                  "description": "Same signer, one step shorter: a redirect that takes them straight into BankID/MitID with no Esigner page in between. For a flow whose own UI already showed the document and collected the approval click.\n\nFalls back to `sign_url` by redirecting there whenever it cannot skip — the request is password-protected, expired, cancelled, or the eID hand-off has not finished — so it is always safe to link. Note the signer then never sees the document on OUR surface: in the hosted eID flow the provider still presents it before signing, so use this when your own product has already put the document in front of them.",
                   "example": "https://esigner.no/api/sign/9f1c0f4e3d2b4a719f3a1c0e5b8d2a44/start"
                 }
               },
@@ -2999,7 +2999,7 @@
                   },
                   "sealFooter": {
                     "type": "boolean",
-                    "description": "Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, \"Forseglet via esigner\" on the right — the shape Posten's signing product uses. Off by default.\n\nThe band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.\n\n**It locks the signer roster.** The band has to go into the PDF before the eID hand-off, because a PAdES signature covers the whole file and nothing can be added afterwards; a signer added later would be missing from a roster already sealed inside the signed document. So `POST /orders/{id}/signers/*` returns 409 `seal_footer_locked` for the life of the request. Decide the signer list up front.\n\nThe band names each signer as `Name (email)` — or just the email or phone number when you gave no name — exactly what you supplied here. It carries no signing dates and no eID-verified legal names: those are only known after signing, and they are on the provider's attest page inside the same file. Only the copy sent for signing is stamped; the source PDF you uploaded is left untouched."
+                    "description": "Stamp a seal band across the bottom of **every page**: the parties who sign it on the left, \"Forseglet via Esigner\" on the right — the shape Posten's signing product uses. Off by default.\n\nThe band goes into the file before anyone has signed, so it names the parties rather than announcing a completed signature.\n\n**It locks the signer roster.** The band has to go into the PDF before the eID hand-off, because a PAdES signature covers the whole file and nothing can be added afterwards; a signer added later would be missing from a roster already sealed inside the signed document. So `POST /orders/{id}/signers/*` returns 409 `seal_footer_locked` for the life of the request. Decide the signer list up front.\n\nThe band names each signer as `Name (email)` — or just the email or phone number when you gave no name — exactly what you supplied here. It carries no signing dates and no eID-verified legal names: those are only known after signing, and they are on the provider's attest page inside the same file. Only the copy sent for signing is stamped; the source PDF you uploaded is left untouched."
                   }
                 },
                 "required": [
